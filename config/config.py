@@ -7,13 +7,13 @@ NETWORK = "C"
 LATITUDE = -19.6685
 LONGITUDE = -69.1942
 
-# Time parameters from Jan 1, 2025 to July 1, 2025
+# Time parameters from Jan 1, 2025 to November 1, 2025
 START_TIME = UTCDateTime("2025-01-01T00:00:00")
-END_TIME = UTCDateTime("2025-07-01T00:00:00")
+END_TIME = UTCDateTime("2025-11-01T00:00:00")
 
 # Analysis parameters
 CHANNEL = "BHZ"
-MIN_MAGNITUDE = 4.0
+MIN_MAGNITUDE = None  # No minimum magnitude filter
 MAX_DISTANCE_KM = 150
 
 # Data storage paths

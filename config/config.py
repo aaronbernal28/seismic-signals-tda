@@ -7,8 +7,8 @@ NETWORK = "C"
 LATITUDE = -19.6685
 LONGITUDE = -69.1942
 
-# Time parameters from Jan 1, 2025 to November 1, 2025
-START_TIME = UTCDateTime("2025-01-01T00:00:00")
+# Time parameters from Nov 1, 2024 to November 1, 2025
+START_TIME = UTCDateTime("2023-11-01T00:00:00")
 END_TIME = UTCDateTime("2025-11-01T00:00:00")
 
 # Analysis parameters

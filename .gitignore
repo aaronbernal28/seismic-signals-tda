@@ -210,3 +210,5 @@ data/*
 scripts/sliding1.py
 scripts/sliding2.py
 scripts/ecg.py
+
+docs/*

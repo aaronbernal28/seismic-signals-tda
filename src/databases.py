@@ -56,4 +56,5 @@ class PersistenceDiagramDatabase:
         if self.sample is not None:
             np.random.seed(self.seed)
             output = np.random.choice(output, size=self.sample, replace=False, axis=0)
+            self.seed += 1
         return output

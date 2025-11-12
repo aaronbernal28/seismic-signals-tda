@@ -19,3 +19,7 @@ MAX_DISTANCE_KM = 150
 # Data storage paths
 RAW_DATA_PATH = "./data/raw/"
 PROCESSED_DATA_PATH = "./data/processed/"
+
+# Train and test paths
+TRAIN_DATA_PATH = "./data/processed/signals_train.hdf5"
+TEST_DATA_PATH = "./data/processed/signals_test.hdf5"

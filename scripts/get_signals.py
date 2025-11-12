@@ -14,12 +14,10 @@ from obspy import UTCDateTime
 # Add parent directory to path to allow imports from config and src
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from config.config import PROCESSED_DATA_PATH, DATA_CENTER, STATION_CODE, NETWORK, CHANNEL
+from config.config import PROCESSED_DATA_PATH, DATA_CENTER, STATION_CODE, NETWORK, CHANNEL, LATITUDE, LONGITUDE
 
 def waveforms(starttime, endtime, client):
     """Download seismic waveform data."""
-
-    print(f"Fetching waveform data for station {STATION_CODE}...")
     try:
         st = client.get_waveforms(
             network=NETWORK,
@@ -29,17 +27,15 @@ def waveforms(starttime, endtime, client):
             starttime=starttime,
             endtime=endtime
         )
-        
-        print(f"✓ Waveform data fetched: {st}")
         return st
-
     except Exception as e:
-        print(f"✗ Error downloading waveforms: {e}")
-        return None
+        raise e
 
-def fetch_and_store_signals(intervals_df, output_file, split_name=""):
+
+def fetch_and_store_signals(intervals_df, output_file, split_name="", batch_size=50, max_workers=3):
     """
     Fetch waveforms for each interval and store in HDF5 file.
+    Uses parallel downloading with smaller batches for efficiency.
     
     Parameters:
     -----------
@@ -49,10 +45,12 @@ def fetch_and_store_signals(intervals_df, output_file, split_name=""):
         Path to output HDF5 file
     split_name : str
         Name of the split (e.g., "train", "test", "eval") for logging
+    batch_size : int
+        Number of intervals to process in parallel (default: 50)
+    max_workers : int
+        Maximum number of parallel download workers (default: 3)
     """
-    # Initialize FDSN client
-    print(f"Initializing FDSN client for {split_name} split..." if split_name else "Initializing FDSN client...")
-    client = Client(DATA_CENTER)
+    print(f"\nProcessing {split_name.upper()} set..." if split_name else "Processing intervals...")
     
     # Create HDF5 file
     with h5py.File(output_file, 'w') as hf:
@@ -75,65 +73,90 @@ def fetch_and_store_signals(intervals_df, output_file, split_name=""):
         # Create signals group
         signals_group = hf.create_group('signals')
         
-        # Fetch waveforms for each interval
         total_intervals = len(intervals_df)
         successful = 0
         failed = 0
         
-        print(f"\nFetching waveforms for {total_intervals} intervals...")
+        print(f"Fetching waveforms for {total_intervals} intervals...")
+        print(f"Using parallel download with {max_workers} workers, batch size: {batch_size}")
         print("-" * 60)
         
-        for idx, row in intervals_df.iterrows():
+        # Process in parallel batches
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        
+        def download_single_interval(row):
+            """Download a single interval's waveform."""
             interval_id = row['id']
             start_time = UTCDateTime(pd.to_datetime(row['start_time']))
             end_time = UTCDateTime(pd.to_datetime(row['end_time']))
             label = row['label']
             
-            print(f"[{idx+1}/{total_intervals}] Processing interval {interval_id} (label={label})...")
-            
             try:
-                # Fetch waveform using utils function
+                client = Client(DATA_CENTER)
                 st = waveforms(start_time, end_time, client)
-                
-                if st is not None and len(st) > 0:
-                    # Process each trace in the stream
-                    interval_group = signals_group.create_group(str(interval_id))
-                    
-                    for trace_idx, trace in enumerate(st):
-                        # Store trace data
-                        trace_group = interval_group.create_group(f'trace_{trace_idx}')
-                        trace_group.create_dataset('data', data=trace.data, compression='gzip')
-                        
-                        # Store trace metadata
-                        trace_group.attrs['sampling_rate'] = trace.stats.sampling_rate
-                        trace_group.attrs['npts'] = trace.stats.npts
-                        trace_group.attrs['network'] = trace.stats.network
-                        trace_group.attrs['station'] = trace.stats.station
-                        trace_group.attrs['location'] = trace.stats.location
-                        trace_group.attrs['channel'] = trace.stats.channel
-                        trace_group.attrs['starttime'] = str(trace.stats.starttime)
-                        trace_group.attrs['endtime'] = str(trace.stats.endtime)
-                    
-                    # Store interval-level metadata
-                    interval_group.attrs['label'] = label
-                    interval_group.attrs['num_traces'] = len(st)
-                    interval_group.attrs['interval_id'] = str(interval_id)
-                    
-                    successful += 1
-                    print(f"  ✓ Stored {len(st)} trace(s)")
-                else:
-                    failed += 1
-                    print(f"  ✗ No data retrieved")
-                    
+                return interval_id, label, st, None
             except Exception as e:
-                failed += 1
-                print(f"  ✗ Error: {e}")
+                return interval_id, label, None, str(e)
+        
+        # Process in batches
+        for batch_start in range(0, total_intervals, batch_size):
+            batch_end = min(batch_start + batch_size, total_intervals)
+            batch_df = intervals_df.iloc[batch_start:batch_end]
             
-            # Progress update every 10 intervals
-            if (idx + 1) % 10 == 0:
-                print(f"\nProgress: {idx+1}/{total_intervals} intervals processed")
-                print(f"  Success: {successful}, Failed: {failed}")
-                print("-" * 60)
+            print(f"\nProcessing batch {batch_start+1}-{batch_end} of {total_intervals}...")
+            
+            # Submit batch downloads
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_to_row = {
+                    executor.submit(download_single_interval, row): (idx, row)
+                    for idx, row in batch_df.iterrows()
+                }
+                
+                # Process completed downloads
+                for future in as_completed(future_to_row):
+                    idx, row = future_to_row[future]
+                    try:
+                        interval_id, label, st, error = future.result()
+                        
+                        if st is not None and len(st) > 0:
+                            # Store in HDF5
+                            interval_group = signals_group.create_group(str(interval_id))
+                            
+                            for trace_idx, trace in enumerate(st):
+                                # Store trace data
+                                trace_group = interval_group.create_group(f'trace_{trace_idx}')
+                                trace_group.create_dataset('data', data=trace.data, compression='gzip')
+                                
+                                # Store trace metadata
+                                trace_group.attrs['sampling_rate'] = trace.stats.sampling_rate
+                                trace_group.attrs['npts'] = trace.stats.npts
+                                trace_group.attrs['network'] = trace.stats.network
+                                trace_group.attrs['station'] = trace.stats.station
+                                trace_group.attrs['location'] = trace.stats.location
+                                trace_group.attrs['channel'] = trace.stats.channel
+                                trace_group.attrs['starttime'] = str(trace.stats.starttime)
+                                trace_group.attrs['endtime'] = str(trace.stats.endtime)
+                            
+                            # Store interval-level metadata
+                            interval_group.attrs['label'] = label
+                            interval_group.attrs['num_traces'] = len(st)
+                            interval_group.attrs['interval_id'] = str(interval_id)
+                            
+                            successful += 1
+                            print(f"  ✓ [{successful+failed}/{total_intervals}] Interval {interval_id}: {len(st)} trace(s)")
+                        else:
+                            failed += 1
+                            error_msg = error[:80] + "..." if error and len(error) > 80 else error
+                            print(f"  ✗ [{successful+failed}/{total_intervals}] Interval {interval_id}: {error_msg or 'No data'}")
+                    
+                    except Exception as e:
+                        failed += 1
+                        print(f"  ✗ [{successful+failed}/{total_intervals}] Error processing: {str(e)[:80]}")
+            
+            # Progress update after each batch
+            print(f"\nBatch complete. Progress: {batch_end}/{total_intervals}")
+            print(f"  Success: {successful}, Failed: {failed}, Rate: {successful/(successful+failed)*100:.1f}%")
+            print("-" * 60)
         
         print(f"\n{'=' * 60}")
         print(f"Summary:")
@@ -144,7 +167,7 @@ def fetch_and_store_signals(intervals_df, output_file, split_name=""):
         print(f"{'=' * 60}")
 
 
-def split_data(intervals_df, train_ratio=0.7, test_ratio=0.2, eval_ratio=0.1, create_eval=False):
+def split_data(intervals_df, train_ratio=0.8, test_ratio=0.2, eval_ratio=0.0, create_eval=False):
     """
     Split data into train, test, and optionally eval sets while maintaining label balance.
     
@@ -233,6 +256,10 @@ def main():
                         help='Test set ratio (default: 0.2)')
     parser.add_argument('--eval-ratio', type=float, default=0.0,
                         help='Evaluation set ratio (default: 0.0)')
+    parser.add_argument('--batch-size', type=int, default=50,
+                        help='Number of intervals to process in parallel (default: 50)')
+    parser.add_argument('--max-workers', type=int, default=3,
+                        help='Maximum parallel download workers (default: 3)')
 
     args = parser.parse_args()
     
@@ -280,13 +307,20 @@ def main():
         
         # Fetch and store signals for each split
         total_size = 0
+        
         for split_name, split_df in splits.items():
             output_file = output_dir / f"signals_{split_name}.hdf5"
             print(f"\n{'=' * 60}")
             print(f"Processing {split_name.upper()} set")
             print(f"{'=' * 60}")
             
-            fetch_and_store_signals(split_df, output_file, split_name)
+            fetch_and_store_signals(
+                split_df, 
+                output_file, 
+                split_name, 
+                batch_size=args.batch_size,
+                max_workers=args.max_workers
+            )
             
             file_size_mb = output_file.stat().st_size / (1024*1024)
             total_size += file_size_mb

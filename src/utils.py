@@ -1,8 +1,39 @@
 from pathlib import Path
 from obspy.clients.fdsn import Client
 from config.config import *
-import numpy as np
-import ecg
+import src.ecg as ecg
+import h5py
+
+class SeismicDataset:
+    """Dataset class for seismic signals."""
+    def __init__(self, data_path=r"data\processed\signals_train.hdf5"):
+        self.data_path = Path(data_path)
+        self.signals = []
+        self.labels = []
+        self._load_data()
+
+    def _load_data(self):
+        """Load seismic signals and labels from the data path."""
+        with h5py.File(self.data_path, 'r') as hf:
+            for interval_id in hf['signals'].keys():
+                sig_group = hf['signals'][interval_id]
+                label = sig_group.attrs.get('label', 0)
+                
+                # Get first trace data
+                trace_name = list(sig_group.keys())[0]
+                data = sig_group[trace_name]['data'][:]
+                
+                self.signals.append(data)
+                self.labels.append(label)
+
+    def __len__(self):
+        return len(self.signals)
+
+    def __getitem__(self, idx):
+        if isinstance(idx, slice):
+            # Support slicing like dataset[:10]
+            return [(self.signals[i], self.labels[i]) for i in range(*idx.indices(len(self)))]
+        return self.signals[idx], self.labels[idx]
 
 def download_waveforms():
     """Download seismic waveform data."""

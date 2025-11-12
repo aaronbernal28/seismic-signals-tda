@@ -37,7 +37,7 @@ def waveforms(starttime, endtime, client):
         print(f"✗ Error downloading waveforms: {e}")
         return None
 
-def fetch_and_store_signals(intervals_df, output_file):
+def fetch_and_store_signals(intervals_df, output_file, split_name=""):
     """
     Fetch waveforms for each interval and store in HDF5 file.
     
@@ -47,9 +47,11 @@ def fetch_and_store_signals(intervals_df, output_file):
         DataFrame with interval information including start_time and end_time
     output_file : Path
         Path to output HDF5 file
+    split_name : str
+        Name of the split (e.g., "train", "test", "eval") for logging
     """
     # Initialize FDSN client
-    print("Initializing FDSN client...")
+    print(f"Initializing FDSN client for {split_name} split..." if split_name else "Initializing FDSN client...")
     client = Client(DATA_CENTER)
     
     # Create HDF5 file
@@ -142,15 +144,104 @@ def fetch_and_store_signals(intervals_df, output_file):
         print(f"{'=' * 60}")
 
 
+def split_data(intervals_df, train_ratio=0.7, test_ratio=0.2, eval_ratio=0.1, create_eval=False):
+    """
+    Split data into train, test, and optionally eval sets while maintaining label balance.
+    
+    Parameters:
+    -----------
+    intervals_df : pd.DataFrame
+        DataFrame with interval information
+    train_ratio : float
+        Proportion of data for training (default: 0.7)
+    test_ratio : float
+        Proportion of data for testing (default: 0.2)
+    eval_ratio : float
+        Proportion of data for evaluation (default: 0.1)
+    create_eval : bool
+        Whether to create evaluation set (default: False)
+    
+    Returns:
+    --------
+    dict: Dictionary with keys 'train', 'test', and optionally 'eval' containing DataFrames
+    """
+    from sklearn.model_selection import train_test_split
+    
+    if not create_eval:
+        # Adjust ratios if no eval set
+        test_ratio_adjusted = test_ratio / (train_ratio + test_ratio)
+        
+        # Split by label to maintain balance
+        train_data = []
+        test_data = []
+        
+        for label in intervals_df['label'].unique():
+            label_data = intervals_df[intervals_df['label'] == label]
+            train_label, test_label = train_test_split(
+                label_data, test_size=test_ratio_adjusted, random_state=42
+            )
+            train_data.append(train_label)
+            test_data.append(test_label)
+        
+        return {
+            'train': pd.concat(train_data).reset_index(drop=True),
+            'test': pd.concat(test_data).reset_index(drop=True)
+        }
+    else:
+        # Three-way split
+        test_eval_ratio = test_ratio + eval_ratio
+        eval_ratio_adjusted = eval_ratio / test_eval_ratio
+        
+        train_data = []
+        test_data = []
+        eval_data = []
+        
+        for label in intervals_df['label'].unique():
+            label_data = intervals_df[intervals_df['label'] == label]
+            
+            # First split: train vs (test + eval)
+            train_label, test_eval_label = train_test_split(
+                label_data, test_size=test_eval_ratio, random_state=42
+            )
+            
+            # Second split: test vs eval
+            test_label, eval_label = train_test_split(
+                test_eval_label, test_size=eval_ratio_adjusted, random_state=42
+            )
+            
+            train_data.append(train_label)
+            test_data.append(test_label)
+            eval_data.append(eval_label)
+        
+        return {
+            'train': pd.concat(train_data).reset_index(drop=True),
+            'test': pd.concat(test_data).reset_index(drop=True),
+            'eval': pd.concat(eval_data).reset_index(drop=True)
+        }
+
+
 def main():
     """Main execution function."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Fetch and split seismic signals into train/test/eval sets')
+    parser.add_argument('--create-eval', action='store_true', default=False,
+                        help='Create evaluation set (default: False)')
+    parser.add_argument('--train-ratio', type=float, default=0.8,
+                        help='Training set ratio (default: 0.8)')
+    parser.add_argument('--test-ratio', type=float, default=0.2,
+                        help='Test set ratio (default: 0.2)')
+    parser.add_argument('--eval-ratio', type=float, default=0.0,
+                        help='Evaluation set ratio (default: 0.0)')
+
+    args = parser.parse_args()
+    
     print("=" * 60)
-    print("Signal Sampling Script")
+    print("Signal Sampling Script with Train/Test/Eval Split")
     print("=" * 60)
     
     # Define file paths
     input_file = Path(PROCESSED_DATA_PATH) / "intervals.csv"
-    output_file = Path(PROCESSED_DATA_PATH) / "signals.hdf5"
     
     # Check if input file exists
     if not input_file.exists():
@@ -168,17 +259,43 @@ def main():
         print(f"  Columns: {list(intervals_df.columns)}")
         print(f"  Labels: {intervals_df['label'].value_counts().to_dict()}")
         
+        # Split data
+        print(f"\nSplitting data (train={args.train_ratio}, test={args.test_ratio}" + 
+              (f", eval={args.eval_ratio}" if args.create_eval else "") + ")...")
+        splits = split_data(
+            intervals_df, 
+            train_ratio=args.train_ratio,
+            test_ratio=args.test_ratio,
+            eval_ratio=args.eval_ratio,
+            create_eval=args.create_eval
+        )
+        
+        for split_name, split_df in splits.items():
+            print(f"\n{split_name.upper()} set: {len(split_df)} intervals")
+            print(f"  Labels: {split_df['label'].value_counts().to_dict()}")
+        
         # Create output directory if it doesn't exist
-        output_file.parent.mkdir(parents=True, exist_ok=True)
+        output_dir = Path(PROCESSED_DATA_PATH)
+        output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Fetch and store signals
-        fetch_and_store_signals(intervals_df, output_file)
-        
-        print(f"\n✓ Signals saved to: {output_file}")
-        print(f"  File size: {output_file.stat().st_size / (1024*1024):.2f} MB")
+        # Fetch and store signals for each split
+        total_size = 0
+        for split_name, split_df in splits.items():
+            output_file = output_dir / f"signals_{split_name}.hdf5"
+            print(f"\n{'=' * 60}")
+            print(f"Processing {split_name.upper()} set")
+            print(f"{'=' * 60}")
+            
+            fetch_and_store_signals(split_df, output_file, split_name)
+            
+            file_size_mb = output_file.stat().st_size / (1024*1024)
+            total_size += file_size_mb
+            print(f"\n✓ {split_name.upper()} signals saved to: {output_file}")
+            print(f"  File size: {file_size_mb:.2f} MB")
         
         print("\n" + "=" * 60)
-        print("✓ Signal sampling completed!")
+        print("✓ All signal sampling completed!")
+        print(f"  Total size: {total_size:.2f} MB")
         print("=" * 60)
         
     except Exception as e:

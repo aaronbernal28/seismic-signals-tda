@@ -3,6 +3,25 @@ from obspy.clients.fdsn import Client
 from config.config import *
 import src.ecg as ecg
 import h5py
+import numpy as np
+import matplotlib.pyplot as plt
+
+def plot_waveform(signal, label='Earthquake', mag=0):
+    """Plot waveform for a given interval."""
+    time = np.arange(len(signal))  # Assume time steps starting from 0
+    plt.plot(time, signal, linewidth=0.5, color='darkblue')
+    plt.title(f'{label} - Mag: {mag}', fontsize=11, fontweight='bold')
+    plt.xlabel('Time (seconds)', fontsize=10)
+    plt.ylabel('Amplitude', fontsize=10)
+    plt.grid(True, alpha=0.3)
+    
+    # Add statistics text
+    stats_text = f'Mean: {np.mean(signal):.2e}\nStd: {np.std(signal):.2e}\nMin: {np.min(signal):.2e}\nMax: {np.max(signal):.2e}'
+    plt.text(0.02, 0.98, stats_text, transform=plt.gca().transAxes, 
+             fontsize=9, verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+    
+    plt.tight_layout()
+    plt.show()
 
 class SeismicDataset:
     """Dataset class for seismic signals."""
@@ -10,21 +29,52 @@ class SeismicDataset:
         self.data_path = Path(data_path)
         self.signals = []
         self.labels = []
+        self.mags = []
         self._load_data()
 
     def _load_data(self):
         """Load seismic signals and labels from the data path."""
         with h5py.File(self.data_path, 'r') as hf:
+            # Load metadata to get mag values
+            metadata_ids = hf['metadata']['id'][:]
+            metadata_mags = hf['metadata']['mag'][:]
+            
+            # Decode bytes to strings if necessary
+            if metadata_ids.dtype.kind == 'S':
+                metadata_ids = [id.decode('utf-8') if id else '' for id in metadata_ids]
+            else:
+                metadata_ids = list(metadata_ids)
+            
+            # Create a mapping from interval_id to mag
+            id_to_mag = dict(zip(metadata_ids, metadata_mags))
+            
+            # Load signals
             for interval_id in hf['signals'].keys():
                 sig_group = hf['signals'][interval_id]
                 label = sig_group.attrs.get('label', 0)
                 
+                # Get mag from metadata using interval_id
+                mag = id_to_mag.get(interval_id, float('nan'))
+                
+                # Convert NaN to 0.0 for non-events
+                if np.isnan(mag):
+                    mag = 0.0
+
                 # Get first trace data
                 trace_name = list(sig_group.keys())[0]
                 data = sig_group[trace_name]['data'][:]
                 
                 self.signals.append(data)
                 self.labels.append(label)
+                self.mags.append(mag)
+        
+        # Shuffle the data randomly
+        np.random.seed(28)  # For reproducibility
+        indices = np.arange(len(self.signals))
+        np.random.shuffle(indices)
+        self.signals = [self.signals[i] for i in indices]
+        self.labels = [self.labels[i] for i in indices]
+        self.mags = [self.mags[i] for i in indices]
 
     def __len__(self):
         return len(self.signals)
@@ -32,8 +82,10 @@ class SeismicDataset:
     def __getitem__(self, idx):
         if isinstance(idx, slice):
             # Support slicing like dataset[:10]
-            return [(self.signals[i], self.labels[i]) for i in range(*idx.indices(len(self)))]
-        return self.signals[idx], self.labels[idx]
+            return [self.signals[i] for i in range(*idx.indices(len(self)))], \
+                   [self.labels[i] for i in range(*idx.indices(len(self)))], \
+                   [self.mags[i] for i in range(*idx.indices(len(self)))]
+        return self.signals[idx], self.labels[idx], self.mags[idx]
 
 def download_waveforms():
     """Download seismic waveform data."""
@@ -64,28 +116,28 @@ def download_waveforms():
         return None
 
 
-def takens_embedding(signal, d, tau):
+def takens_embedding(signal, dim, tau):
     """Takens' embedding
     Args:
         signal (np.ndarray): 1D array of the time series signal.
-        d (int): Embedding dimension.
+        dim (int): Embedding dimension.
         tau (int): Time delay.
     Returns:
-        np.ndarray: 2D array of shape (m, d) where m = n - (d - 1) * tau.
+        np.ndarray: 2D array of shape (m, dim) where m = n - (dim - 1) * tau.
     """
-    return ecg.takens_embedding(signal, d, tau)
+    return ecg.takens_embedding(signal, dim, tau)
 
-def compute_persistence(point_cloud, maxdim=1):
+def compute_persistence(point_cloud, maxdim=1, thresh=np.inf, metric='euclidean'):
     """Compute persistence diagrams using Ripser.
     
     Args:
         point_cloud (np.ndarray): 2D array of shape (n_points, n_dimensions) representing the point cloud.
         maxdim (int): Maximum homology dimension to compute. Default is 1.
-    
+        thresh (float): Maximum filtration value. Default is infinity.
     Returns:
         list: List of persistence diagrams, one for each dimension up to maxdim.
     """
-    return ecg.compute_persistence(point_cloud, maxdim)
+    return ecg.compute_persistence(point_cloud, maxdim, thresh, metric)
 
 def bottleneck_distance(dgm1, dgm2):
     """Compute the bottleneck distance between two persistence diagrams.

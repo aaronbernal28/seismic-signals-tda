@@ -2,7 +2,7 @@ import numpy as np
 from src.utils import takens_embedding, compute_persistence
 
 class PersistenceDiagramDatabase:
-    def __init__(self, labels=[0, 1], dim=4, tau=10, maxdim=2, sample=None):
+    def __init__(self, labels=[0, 1], dim=4, tau=10, maxdim=2, sample=None, thresh=np.inf):
         """Initialize the persistence diagram database.
         Args:
             labels (list): List of unique identifiers for diagrams.
@@ -18,6 +18,7 @@ class PersistenceDiagramDatabase:
         self.db = {label: {dim: [] for dim in range(maxdim + 1)} for label in labels}
         self.seed = 28
         self.sample = sample
+        self.thresh = thresh
 
     def add_diagram(self, diagram, label, dim=0):
         """Add a persistence diagram to the database.
@@ -37,8 +38,9 @@ class PersistenceDiagramDatabase:
             signal (np.ndarray): 1D array of the time series signal.
             label (int): Unique identifier for the diagram.
         """
-        embedded = takens_embedding(signal, dim=self.dim, delay=self.tau)
-        diagrams = compute_persistence(embedded, maxdim=self.maxdim)
+        embedded = takens_embedding(signal, dim=self.dim, tau=self.tau)
+        #print("Embedded shape:", embedded.shape, end="\n")
+        diagrams = compute_persistence(embedded, maxdim=self.maxdim, thresh=self.thresh)
         for dim in range(len(diagrams)):
             self.add_diagram(diagrams[dim], label, dim)
     
@@ -50,11 +52,12 @@ class PersistenceDiagramDatabase:
             dim (int): Homology dimension.
             sample (int, optional): If provided, randomly sample this many diagrams.
         Returns:
-            np.ndarray: Array of persistence diagrams. (M x ~N x 2)
+            list: List of persistence diagrams, each as np.ndarray of shape (~N, 2)
         """
-        output = np.array(self.db[label][dim])
+        output = self.db[label][dim]  # Keep as list since diagrams have varying shapes
         if self.sample is not None:
             np.random.seed(self.seed)
-            output = np.random.choice(output, size=self.sample, replace=False, axis=0)
+            indices = np.random.choice(len(output), size=min(self.sample, len(output)), replace=False)
+            output = [output[i] for i in indices]
             self.seed += 1
         return output

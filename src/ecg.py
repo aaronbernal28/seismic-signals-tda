@@ -87,8 +87,8 @@ def takens_embedding(signal, dim=4, delay=10):
         embedded[i] = signal[i:i + dim * delay:delay]
     return embedded
 
-def compute_persistence(point_cloud, maxdim=1):
-    result = ripser(point_cloud, maxdim=maxdim)
+def compute_persistence(point_cloud, maxdim=1, thresh=np.inf, metric='euclidean'):
+    result = ripser(point_cloud, maxdim=maxdim, thresh=thresh, metric=metric)
     return result['dgms']
 
 def bottleneck_distance(dgm1, dgm2):

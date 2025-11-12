@@ -10,11 +10,54 @@ import h5py
 import numpy as np
 from obspy.clients.fdsn import Client
 from obspy import UTCDateTime
+import warnings
 
 # Add parent directory to path to allow imports from config and src
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config.config import PROCESSED_DATA_PATH, DATA_CENTER, STATION_CODE, NETWORK, CHANNEL, LATITUDE, LONGITUDE
+
+def preprocess_trace(trace):
+    """
+    Apply preprocessing steps to a seismic trace.
+    
+    Steps:
+    1. Detrend - remove mean
+    2. Detrend - remove linear trend
+    3. Remove instrument response (convert to displacement)
+    
+    Parameters:
+    -----------
+    trace : obspy.Trace
+        Input seismic trace
+        
+    Returns:
+    --------
+    obspy.Trace : Preprocessed trace
+    """
+    try:
+        # Make a copy to avoid modifying original
+        trace_copy = trace.copy()
+        
+        # Step 1: Remove mean
+        trace_copy.detrend('demean')
+        
+        # Step 2: Remove linear trend
+        trace_copy.detrend('linear')
+        
+        # Step 3: Remove instrument response (convert to displacement)
+        # Suppress warnings about response removal
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            trace_copy.remove_response(output='DISP')
+        
+        return trace_copy
+        
+    except Exception as e:
+        # If preprocessing fails, log the error and return original trace
+        print(f"    ⚠ Warning: Preprocessing failed for trace {trace.id}: {str(e)[:50]}")
+        return trace
+
 
 def waveforms(starttime, endtime, client):
     """Download seismic waveform data."""
@@ -123,19 +166,23 @@ def fetch_and_store_signals(intervals_df, output_file, split_name="", batch_size
                             interval_group = signals_group.create_group(str(interval_id))
                             
                             for trace_idx, trace in enumerate(st):
-                                # Store trace data
+                                # Apply preprocessing to trace
+                                preprocessed_trace = preprocess_trace(trace)
+                                
+                                # Store preprocessed trace data
                                 trace_group = interval_group.create_group(f'trace_{trace_idx}')
-                                trace_group.create_dataset('data', data=trace.data, compression='gzip')
+                                trace_group.create_dataset('data', data=preprocessed_trace.data, compression='gzip')
                                 
                                 # Store trace metadata
-                                trace_group.attrs['sampling_rate'] = trace.stats.sampling_rate
-                                trace_group.attrs['npts'] = trace.stats.npts
-                                trace_group.attrs['network'] = trace.stats.network
-                                trace_group.attrs['station'] = trace.stats.station
-                                trace_group.attrs['location'] = trace.stats.location
-                                trace_group.attrs['channel'] = trace.stats.channel
-                                trace_group.attrs['starttime'] = str(trace.stats.starttime)
-                                trace_group.attrs['endtime'] = str(trace.stats.endtime)
+                                trace_group.attrs['sampling_rate'] = preprocessed_trace.stats.sampling_rate
+                                trace_group.attrs['npts'] = preprocessed_trace.stats.npts
+                                trace_group.attrs['network'] = preprocessed_trace.stats.network
+                                trace_group.attrs['station'] = preprocessed_trace.stats.station
+                                trace_group.attrs['location'] = preprocessed_trace.stats.location
+                                trace_group.attrs['channel'] = preprocessed_trace.stats.channel
+                                trace_group.attrs['starttime'] = str(preprocessed_trace.stats.starttime)
+                                trace_group.attrs['endtime'] = str(preprocessed_trace.stats.endtime)
+                                trace_group.attrs['preprocessed'] = True  # Flag to indicate preprocessing was applied
                             
                             # Store interval-level metadata
                             interval_group.attrs['label'] = label

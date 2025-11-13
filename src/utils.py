@@ -86,6 +86,10 @@ class SeismicDataset:
                    [self.labels[i] for i in range(*idx.indices(len(self)))], \
                    [self.mags[i] for i in range(*idx.indices(len(self)))]
         return self.signals[idx], self.labels[idx], self.mags[idx]
+    
+    def get_data(self):
+        """Get all signals, labels, and mags as numpy arrays."""
+        return self.signals, np.array(self.labels), np.array(self.mags)
 
 def download_waveforms():
     """Download seismic waveform data."""

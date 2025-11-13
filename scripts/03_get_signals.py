@@ -10,69 +10,12 @@ import h5py
 import numpy as np
 from obspy.clients.fdsn import Client
 from obspy import UTCDateTime
-import warnings
 
 # Add parent directory to path to allow imports from config and src
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config.config import PROCESSED_DATA_PATH, DATA_CENTER, STATION_CODE, NETWORK, CHANNEL, LATITUDE, LONGITUDE
-
-def preprocess_trace(trace):
-    """
-    Apply preprocessing steps to a seismic trace.
-    
-    Steps:
-    1. Detrend - remove mean
-    2. Detrend - remove linear trend
-    3. Remove instrument response (convert to displacement)
-    
-    Parameters:
-    -----------
-    trace : obspy.Trace
-        Input seismic trace
-        
-    Returns:
-    --------
-    obspy.Trace : Preprocessed trace
-    """
-    try:
-        # Make a copy to avoid modifying original
-        trace_copy = trace.copy()
-        
-        # Step 1: Remove mean
-        trace_copy.detrend('demean')
-        
-        # Step 2: Remove linear trend
-        trace_copy.detrend('linear')
-        
-        # Step 3: Remove instrument response (convert to displacement)
-        # Suppress warnings about response removal
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            trace_copy.remove_response(output='DISP')
-        
-        return trace_copy
-        
-    except Exception as e:
-        # If preprocessing fails, log the error and return original trace
-        print(f"    ⚠ Warning: Preprocessing failed for trace {trace.id}: {str(e)[:50]}")
-        return trace
-
-
-def waveforms(starttime, endtime, client):
-    """Download seismic waveform data."""
-    try:
-        st = client.get_waveforms(
-            network=NETWORK,
-            station=STATION_CODE,
-            location="*",
-            channel=CHANNEL,
-            starttime=starttime,
-            endtime=endtime
-        )
-        return st
-    except Exception as e:
-        raise e
+from src.preprocess import preprocess_trace, download_waveforms, split_data
 
 
 def fetch_and_store_signals(intervals_df, output_file, split_name="", batch_size=50, max_workers=3):
@@ -136,7 +79,7 @@ def fetch_and_store_signals(intervals_df, output_file, split_name="", batch_size
             
             try:
                 client = Client(DATA_CENTER)
-                st = waveforms(start_time, end_time, client)
+                st = download_waveforms(client, NETWORK, STATION_CODE, CHANNEL, start_time, end_time)
                 return interval_id, label, st, None
             except Exception as e:
                 return interval_id, label, None, str(e)
@@ -167,7 +110,7 @@ def fetch_and_store_signals(intervals_df, output_file, split_name="", batch_size
                             
                             for trace_idx, trace in enumerate(st):
                                 # Apply preprocessing to trace
-                                preprocessed_trace = preprocess_trace(trace)
+                                preprocessed_trace, preprocess_success = preprocess_trace(trace)
                                 
                                 # Store preprocessed trace data
                                 trace_group = interval_group.create_group(f'trace_{trace_idx}')
@@ -182,7 +125,9 @@ def fetch_and_store_signals(intervals_df, output_file, split_name="", batch_size
                                 trace_group.attrs['channel'] = preprocessed_trace.stats.channel
                                 trace_group.attrs['starttime'] = str(preprocessed_trace.stats.starttime)
                                 trace_group.attrs['endtime'] = str(preprocessed_trace.stats.endtime)
-                                trace_group.attrs['preprocessed'] = True  # Flag to indicate preprocessing was applied
+                                trace_group.attrs['preprocessed'] = preprocess_success  # Flag indicates if ALL preprocessing steps succeeded
+                                trace_group.attrs['detrended'] = True  # Basic detrending is always applied
+                                trace_group.attrs['response_removed'] = preprocess_success  # Response removal only succeeds if metadata available
                             
                             # Store interval-level metadata
                             interval_group.attrs['label'] = label
@@ -214,82 +159,6 @@ def fetch_and_store_signals(intervals_df, output_file, split_name="", batch_size
         print(f"{'=' * 60}")
 
 
-def split_data(intervals_df, train_ratio=0.8, test_ratio=0.2, eval_ratio=0.0, create_eval=False):
-    """
-    Split data into train, test, and optionally eval sets while maintaining label balance.
-    
-    Parameters:
-    -----------
-    intervals_df : pd.DataFrame
-        DataFrame with interval information
-    train_ratio : float
-        Proportion of data for training (default: 0.7)
-    test_ratio : float
-        Proportion of data for testing (default: 0.2)
-    eval_ratio : float
-        Proportion of data for evaluation (default: 0.1)
-    create_eval : bool
-        Whether to create evaluation set (default: False)
-    
-    Returns:
-    --------
-    dict: Dictionary with keys 'train', 'test', and optionally 'eval' containing DataFrames
-    """
-    from sklearn.model_selection import train_test_split
-    
-    if not create_eval:
-        # Adjust ratios if no eval set
-        test_ratio_adjusted = test_ratio / (train_ratio + test_ratio)
-        
-        # Split by label to maintain balance
-        train_data = []
-        test_data = []
-        
-        for label in intervals_df['label'].unique():
-            label_data = intervals_df[intervals_df['label'] == label]
-            train_label, test_label = train_test_split(
-                label_data, test_size=test_ratio_adjusted, random_state=42
-            )
-            train_data.append(train_label)
-            test_data.append(test_label)
-        
-        return {
-            'train': pd.concat(train_data).reset_index(drop=True),
-            'test': pd.concat(test_data).reset_index(drop=True)
-        }
-    else:
-        # Three-way split
-        test_eval_ratio = test_ratio + eval_ratio
-        eval_ratio_adjusted = eval_ratio / test_eval_ratio
-        
-        train_data = []
-        test_data = []
-        eval_data = []
-        
-        for label in intervals_df['label'].unique():
-            label_data = intervals_df[intervals_df['label'] == label]
-            
-            # First split: train vs (test + eval)
-            train_label, test_eval_label = train_test_split(
-                label_data, test_size=test_eval_ratio, random_state=42
-            )
-            
-            # Second split: test vs eval
-            test_label, eval_label = train_test_split(
-                test_eval_label, test_size=eval_ratio_adjusted, random_state=42
-            )
-            
-            train_data.append(train_label)
-            test_data.append(test_label)
-            eval_data.append(eval_label)
-        
-        return {
-            'train': pd.concat(train_data).reset_index(drop=True),
-            'test': pd.concat(test_data).reset_index(drop=True),
-            'eval': pd.concat(eval_data).reset_index(drop=True)
-        }
-
-
 def main():
     """Main execution function."""
     import argparse
@@ -315,12 +184,12 @@ def main():
     print("=" * 60)
     
     # Define file paths
-    input_file = Path(PROCESSED_DATA_PATH) / "intervals.csv"
+    input_file = Path(PROCESSED_DATA_PATH) / "signal_intervals.csv"
     
     # Check if input file exists
     if not input_file.exists():
         print(f"✗ Error: Input file not found: {input_file}")
-        print("  Please ensure intervals.csv exists in data/processed/")
+        print("  Please ensure signal_intervals.csv exists in data/processed/")
         print("  (Run get_intervals.py or get_signal_intervals.py first)")
         return
     

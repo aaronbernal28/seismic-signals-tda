@@ -10,9 +10,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from obspy.clients.fdsn import Client
-from obspy.geodetics import locations2degrees
 from obspy.core.event import Catalog
 from config.config import *
+from src.preprocess import download_events as download_events_func, filter_events_by_distance
 
 
 def download_events():
@@ -23,19 +23,19 @@ def download_events():
     window = 5  # degrees
     
     try:
-        catalog = client.get_events(
-            starttime=START_TIME,
-            endtime=END_TIME,
-            minlatitude=LATITUDE - window,
-            maxlatitude=LATITUDE + window,
-            minlongitude=LONGITUDE - window,
-            maxlongitude=LONGITUDE + window
+        catalog = download_events_func(
+            client=client,
+            start_time=START_TIME,
+            end_time=END_TIME,
+            latitude=LATITUDE,
+            longitude=LONGITUDE,
+            window_degrees=window
         )
         
         print(f"  Found {len(catalog)} events")
         
         # Filter by distance
-        filtered_catalog = filter_events_by_distance(catalog)
+        filtered_catalog = filter_events_by_distance(catalog, LATITUDE, LONGITUDE, MAX_DISTANCE_KM)
         
         # Save to file
         output_file = Path(RAW_DATA_PATH) / "events.xml"
@@ -49,24 +49,6 @@ def download_events():
     except Exception as e:
         print(f"✗ Error downloading events: {e}")
         return None
-
-
-def filter_events_by_distance(catalog):
-    """Filter events by distance from station."""
-    max_distance_degrees = MAX_DISTANCE_KM / 111.19
-    filtered = []
-    
-    for event in catalog:
-        origin = event.preferred_origin() or event.origins[0]
-        eq_lat = origin.latitude
-        eq_lon = origin.longitude
-        
-        distance_degrees = locations2degrees(eq_lat, eq_lon, LATITUDE, LONGITUDE)
-        
-        if distance_degrees <= max_distance_degrees:
-            filtered.append(event)
-    
-    return filtered
 
 
 def main():

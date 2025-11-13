@@ -212,3 +212,4 @@ scripts/sliding2.py
 scripts/ecg.py
 
 docs/*
+scripts/fps/*

@@ -54,7 +54,8 @@ def randomized_search_te(X, y, param_distributions, n_iter=10, cv=3, random_stat
         random_state=random_state,
         verbose=2,
         n_jobs=n_jobs,
-        return_train_score=True
+        return_train_score=True,
+        error_score='raise'
     )
     
     # Fit the random search
@@ -102,7 +103,8 @@ def randomized_search_mfcc(X, y, param_distributions, n_iter=10, cv=3, random_st
         random_state=random_state,
         verbose=2,
         n_jobs=n_jobs,
-        return_train_score=True
+        return_train_score=True,
+        error_score='raise'
     )
     
     # Fit the random search
@@ -180,10 +182,10 @@ def main():
     param_distributions = {
         'distance': [wasserstein, bottleneck],  # distance metric between persistence diagrams
         'weights': [[1], [2, 1]],  # Weights for distance calculation, the length depends on homology dimensions used
-        'sample': [10, 20, 30, None],  # Number of diagrams to sample
-        'thresh': [np.inf, 5000, 10000],  # Threshold
+        'sample': [10, 20, 30],#[10, 20, 30, None],  # Number of diagrams to sample
+        'thresh': [1000],#[np.inf, 5000, 10000],  # Threshold
         'alpha': [0.25, 0.5, 0.75, 1.0],  # FPS subsampling proportion
-        'max_points': [100, 200, 300, np.inf],  # Maximum number of Takens points
+        'max_points': [200],#[100, 200, 300, np.inf],  # Maximum number of Takens points
         'seed': [28]  # Random seed for reproducibility
     }
 
@@ -206,8 +208,8 @@ def main():
     # =========================================================================
     # GRID SEARCH PARAMETERS
     # =========================================================================
-    n_iter = 100  # Number of random parameter combinations to try per model
-    cv_folds = 3  # Number of cross-validation folds
+    n_iter = 150  # Number of random parameter combinations to try per model
+    cv_folds = 5  # Number of cross-validation folds
     random_state = 28  # Random seed for reproducibility
     n_jobs = -1  # Number of parallel jobs for RandomizedSearchCV
     

@@ -4,39 +4,78 @@ import numpy as np
 from src.databases import PersistenceDiagramDatabaseTE
 from persim import bottleneck
 from sklearn.metrics import roc_auc_score
+from sklearn.base import BaseEstimator, ClassifierMixin
 
-class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
-    def __init__(self, distance=bottleneck, weights=[1], dim=100, tau=10, stride=1, maxdim=None, sample=10, thresh=np.inf, alpha=0.1, max_points=500):
-        """ Initialize the binary classification model.
+
+class BinaryClassificationTE(PersistenceDiagramDatabaseTE, BaseEstimator, ClassifierMixin):
+    def __init__(
+        self,
+        distance=bottleneck,
+        weights=(1,),
+        dim=100,
+        tau=10,
+        stride=1,
+        maxdim=None,
+        sample=10,
+        thresh=np.inf,
+        alpha=0.1,
+        max_points=500,
+        seed=28,
+    ):
+        """Initialize the binary classification model.
         Args:
             distance: function to compute distance between persistence diagrams
-            weights: List[float] weights for each homology dimension
+            weights: sequence of floats, weights for each homology dimension
             dim: int, embedding dimension
             tau: int, time delay
             stride: int, stride for sliding window
+            maxdim: int or None, maximum homology dimension to compute (if None, inferred from weights)
             sample: int or None, number of diagrams to sample for distance computation
             thresh: float, threshold for diagram points
-            alpha: float, weight for birth-death transformation
+            alpha: float, FPS subsampling proportion
+            max_points: int or np.inf, cap for FPS points
+            seed: int, RNG seed
         """
-        # If maxdim is provided, ensure it matches len(weights)-1
-        if maxdim is None:
-            maxdim = len(weights) - 1
-        assert len(weights) == maxdim + 1, "Weights length must match maxdim + 1"
-
-        super().__init__(
-            dim=dim, tau=tau,
-            stride=stride,
-            maxdim=maxdim,
-            sample=sample,
-            thresh=thresh,
-            alpha=alpha,
-            max_points=max_points)
+        # Store parameters exactly as given (scikit-learn compatibility)
         self.distance = distance
-        self.weights = weights  # Store original weights for sklearn compatibility
-        self._normalized_weights = np.array(weights)/np.sum(weights)  # Normalized weights for computation
-        # Keep a copy of init params for sklearn compatibility
-        self._init_params = dict(distance=distance, weights=list(weights), dim=dim, tau=tau,
-                                 stride=stride, maxdim=maxdim, sample=sample, thresh=thresh, alpha=alpha)
+        self.weights = weights
+        self.dim = dim
+        self.tau = tau
+        self.stride = stride
+        self.maxdim = maxdim
+        self.sample = sample
+        self.thresh = thresh
+        self.alpha = alpha
+        self.max_points = max_points
+        self.seed = seed
+
+        # Lazy initialization of the base database once all effective params are known
+        self._initialized = False
+        self._normalized_weights = None
+
+    # Internal helpers -----------------------------------------------------
+    def _effective_maxdim(self):
+        return (len(self.weights) - 1) if self.maxdim is None else self.maxdim
+
+    def _ensure_initialized(self):
+        if not self._initialized:
+            # Initialize base database with effective maxdim
+            PersistenceDiagramDatabaseTE.__init__(
+                self,
+                dim=self.dim,
+                tau=self.tau,
+                stride=self.stride,
+                maxdim=self._effective_maxdim(),
+                sample=self.sample,
+                thresh=self.thresh,
+                alpha=self.alpha,
+                max_points=self.max_points,
+                seed=self.seed,
+            )
+            w = np.asarray(self.weights, dtype=float)
+            s = np.sum(w)
+            self._normalized_weights = (w / s) if s != 0 else np.asarray(self.weights, dtype=float)
+            self._initialized = True
     
     def fit(self, X, y, verbose=False):
         """ Fit the binary classification model. 
@@ -44,6 +83,10 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
             X: List[ndarray] (n_samples, ~n_signals)
             y: List[int] of labels (0 or 1)
         """
+        self._ensure_initialized()
+        # Store classes for scikit-learn compatibility
+        self.classes_ = np.unique(y)
+        
         for i, (xs, yi) in enumerate(zip(X, y)):
             self.add_signal(xs, label=yi)
             if verbose and (i % 10 == 0):
@@ -58,50 +101,7 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
                     # Print statistics
                     if pc_len:
                         print(f"Label {label}, Dim {d}: Mean diagram size: {np.mean(pc_len):.2f}, Std: {np.std(pc_len):.2f}, Max: {np.max(pc_len)}, Min: {np.min(pc_len)}")
-        print("Model fitting complete." )
-
-    # --- Scikit-learn compatibility ---
-    def get_params(self, deep=True):
-        params = dict(self._init_params)
-        # Reflect any runtime changes
-        params.update(dict(
-            distance=self.distance,
-            weights=list(self.weights),
-            dim=self.dim,
-            tau=self.tau,
-            stride=self.stride,
-            maxdim=self.maxdim,
-            sample=self.sample,
-            thresh=self.thresh,
-            alpha=self.alpha,
-        ))
-        return params
-
-    def set_params(self, **params):
-        # Update known params
-        for k, v in params.items():
-            if k in self._init_params:
-                self._init_params[k] = v
-        # Rebuild internal state if structural params changed
-        distance = params.get('distance', self.distance)
-        weights = params.get('weights', list(self.weights))
-        dim = params.get('dim', self.dim)
-        tau = params.get('tau', self.tau)
-        stride = params.get('stride', self.stride)
-        maxdim = params.get('maxdim', self.maxdim)
-        sample = params.get('sample', self.sample)
-        thresh = params.get('thresh', self.thresh)
-        alpha = params.get('alpha', self.alpha)
-
-        # Validate weights vs maxdim
-        if len(weights) != maxdim + 1:
-            raise ValueError("Weights length must match maxdim + 1")
-
-        # Reset base class state
-        super().__init__(dim=dim, tau=tau, stride=stride, maxdim=maxdim, sample=sample, thresh=thresh, alpha=alpha)
-        self.distance = distance
-        self.weights = weights  # Store original weights
-        self._normalized_weights = np.array(weights) / np.sum(weights)  # Normalized weights
+        print("Model fitting complete.")
         return self
 
     def predict_proba_sample(self, xs):
@@ -111,6 +111,7 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
         Returns:
             prob: float in [0, 1]
         """
+        self._ensure_initialized()
         # Compute persistence diagram for the input signal
         try:
             xs_dgm = self.transform(xs)
@@ -159,9 +160,12 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
         Args:
             X: List[ndarray] (n_samples, ~n_signals)
         Returns:
-            probs: List[float] of probabilities in [0, 1]
+            probs: ndarray of shape (n_samples, 2) with probabilities for each class
         """
-        probs = [self.predict_proba_sample(xs) for xs in X]
+        self._ensure_initialized()
+        probs_class1 = [self.predict_proba_sample(xs) for xs in X]
+        # Return 2D array: [prob_class_0, prob_class_1] for each sample
+        probs = np.array([[1 - p, p] for p in probs_class1])
         return probs
 
     def predict(self, X):
@@ -184,5 +188,6 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
             auc: float ROC AUC score
         """
         probs = self.predict_proba(X)
-        auc = roc_auc_score(y, probs)
+        # Use probabilities for class 1 (positive class)
+        auc = roc_auc_score(y, probs[:, 1])
         return auc

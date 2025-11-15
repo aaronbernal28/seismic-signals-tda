@@ -4,46 +4,67 @@ import numpy as np
 from src.databases import PersistenceDiagramDatabaseMFCC
 from persim import bottleneck
 from sklearn.metrics import roc_auc_score
+from sklearn.base import BaseEstimator, ClassifierMixin
 
-class BinaryClassificationMFCC(PersistenceDiagramDatabaseMFCC):
-    def __init__(self, distance=bottleneck, weights=[1], n_mfcc=40, sr=40.0, win_length_sec=0.3, 
-                 hop_length_sec=0.2, maxdim=None, sample=10, thresh=np.inf, alpha=0.1, max_points=500):
-        """ Initialize the binary classification model using MFCC features.
-        Args:
-            distance: function to compute distance between persistence diagrams
-            weights: List[float] weights for each homology dimension
-            n_mfcc: int, number of MFCC coefficients
-            sr: float, sample rate of signals
-            win_length_sec: float, window length in seconds for MFCC
-            hop_length_sec: float, hop length in seconds for MFCC
-            maxdim: int, maximum homology dimension to compute
-            sample: int or None, number of diagrams to sample for distance computation
-            thresh: float, threshold for diagram points
-            alpha: float, proportion of points to keep after FPS subsampling
+
+class BinaryClassificationMFCC(PersistenceDiagramDatabaseMFCC, BaseEstimator, ClassifierMixin):
+    def __init__(
+        self,
+        distance=bottleneck,
+        weights=(1,),
+        n_mfcc=40,
+        sr=40.0,
+        win_length_sec=0.3,
+        hop_length_sec=0.2,
+        maxdim=None,
+        sample=10,
+        thresh=np.inf,
+        alpha=0.1,
+        max_points=500,
+        seed=28,
+    ):
+        """Initialize the binary classification model using MFCC features.
+        Stores params exactly for scikit-learn compatibility; lazily initializes the database.
         """
-        # If maxdim is provided, ensure it matches len(weights)-1
-        if maxdim is None:
-            maxdim = len(weights) - 1
-        assert len(weights) == maxdim + 1, "Weights length must match maxdim + 1"
-
-        super().__init__(
-            n_mfcc=n_mfcc,
-            sr=sr,
-            win_length_sec=win_length_sec,
-            hop_length_sec=hop_length_sec,
-            maxdim=maxdim,
-            sample=sample,
-            thresh=thresh,
-            alpha=alpha,
-            max_points=max_points
-        )
         self.distance = distance
-        self.weights = weights  # Store original weights for sklearn compatibility
-        self._normalized_weights = np.array(weights) / np.sum(weights)  # Normalized weights for computation
-        # Keep a copy of init params for sklearn compatibility
-        self._init_params = dict(distance=distance, weights=list(weights), n_mfcc=n_mfcc, sr=sr,
-                                 win_length_sec=win_length_sec, hop_length_sec=hop_length_sec,
-                                 maxdim=maxdim, sample=sample, thresh=thresh, alpha=alpha)
+        self.weights = weights
+        self.n_mfcc = n_mfcc
+        self.sr = sr
+        self.win_length_sec = win_length_sec
+        self.hop_length_sec = hop_length_sec
+        self.maxdim = maxdim
+        self.sample = sample
+        self.thresh = thresh
+        self.alpha = alpha
+        self.max_points = max_points
+        self.seed = seed
+
+        self._initialized = False
+        self._normalized_weights = None
+
+    # Internal helpers -----------------------------------------------------
+    def _effective_maxdim(self):
+        return (len(self.weights) - 1) if self.maxdim is None else self.maxdim
+
+    def _ensure_initialized(self):
+        if not self._initialized:
+            PersistenceDiagramDatabaseMFCC.__init__(
+                self,
+                n_mfcc=self.n_mfcc,
+                sr=self.sr,
+                win_length_sec=self.win_length_sec,
+                hop_length_sec=self.hop_length_sec,
+                maxdim=self._effective_maxdim(),
+                sample=self.sample,
+                thresh=self.thresh,
+                alpha=self.alpha,
+                max_points=self.max_points,
+                seed=self.seed,
+            )
+            w = np.asarray(self.weights, dtype=float)
+            s = np.sum(w)
+            self._normalized_weights = (w / s) if s != 0 else np.asarray(self.weights, dtype=float)
+            self._initialized = True
     
     def fit(self, X, y, verbose=False):
         """ Fit the binary classification model. 
@@ -51,6 +72,10 @@ class BinaryClassificationMFCC(PersistenceDiagramDatabaseMFCC):
             X: List[ndarray] - each element is a 1D signal
             y: List[int] of labels (0 or 1)
         """
+        self._ensure_initialized()
+        # Store classes for scikit-learn compatibility
+        self.classes_ = np.unique(y)
+        
         for i, (signal, yi) in enumerate(zip(X, y)):
             self.add_signal(signal, label=yi)
             if verbose and (i % 10 == 0):
@@ -65,48 +90,6 @@ class BinaryClassificationMFCC(PersistenceDiagramDatabaseMFCC):
                     if pc_len:
                         print(f"Label {label}, Dim {d}: Mean diagram size: {np.mean(pc_len):.2f}, Std: {np.std(pc_len):.2f}, Max: {np.max(pc_len)}, Min: {np.min(pc_len)}")
         print("Model fitting complete.")
-
-    # --- Scikit-learn compatibility ---
-    def get_params(self, deep=True):
-        params = dict(self._init_params)
-        params.update(dict(
-            distance=self.distance,
-            weights=list(self.weights),
-            n_mfcc=self.n_mfcc,
-            sr=self.sr,
-            win_length_sec=self.win_length / self.sr,
-            hop_length_sec=self.hop_length / self.sr,
-            maxdim=self.maxdim,
-            sample=self.sample,
-            thresh=self.thresh,
-            alpha=self.alpha,
-        ))
-        return params
-
-    def set_params(self, **params):
-        for k, v in params.items():
-            if k in self._init_params:
-                self._init_params[k] = v
-
-        distance = params.get('distance', self.distance)
-        weights = params.get('weights', list(self.weights))
-        n_mfcc = params.get('n_mfcc', self.n_mfcc)
-        sr = params.get('sr', self.sr)
-        win_length_sec = params.get('win_length_sec', self.win_length / self.sr)
-        hop_length_sec = params.get('hop_length_sec', self.hop_length / self.sr)
-        maxdim = params.get('maxdim', self.maxdim)
-        sample = params.get('sample', self.sample)
-        thresh = params.get('thresh', self.thresh)
-        alpha = params.get('alpha', self.alpha)
-
-        if len(weights) != maxdim + 1:
-            raise ValueError("Weights length must match maxdim + 1")
-
-        super().__init__(n_mfcc=n_mfcc, sr=sr, win_length_sec=win_length_sec, hop_length_sec=hop_length_sec,
-                         maxdim=maxdim, sample=sample, thresh=thresh, alpha=alpha)
-        self.distance = distance
-        self.weights = weights  # Store original weights
-        self._normalized_weights = np.array(weights) / np.sum(weights)  # Normalized weights
         return self
 
     def predict_proba_sample(self, signal):
@@ -116,6 +99,7 @@ class BinaryClassificationMFCC(PersistenceDiagramDatabaseMFCC):
         Returns:
             prob: float in [0, 1]
         """
+        self._ensure_initialized()
         try:
             xs_dgm = self.transform(signal)
         except Exception as e:
@@ -159,9 +143,12 @@ class BinaryClassificationMFCC(PersistenceDiagramDatabaseMFCC):
         Args:
             X: List[ndarray] - each element is a 1D signal
         Returns:
-            probs: List[float] of probabilities in [0, 1]
+            probs: ndarray of shape (n_samples, 2) with probabilities for each class
         """
-        probs = [self.predict_proba_sample(signal) for signal in X]
+        self._ensure_initialized()
+        probs_class1 = [self.predict_proba_sample(signal) for signal in X]
+        # Return 2D array: [prob_class_0, prob_class_1] for each sample
+        probs = np.array([[1 - p, p] for p in probs_class1])
         return probs
 
     def predict(self, X):
@@ -184,6 +171,7 @@ class BinaryClassificationMFCC(PersistenceDiagramDatabaseMFCC):
             auc: float ROC AUC score
         """
         probs = self.predict_proba(X)
-        auc = roc_auc_score(y, probs)
+        # Use probabilities for class 1 (positive class)
+        auc = roc_auc_score(y, probs[:, 1])
         return auc
     

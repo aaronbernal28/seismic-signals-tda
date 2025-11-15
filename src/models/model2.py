@@ -32,7 +32,8 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
             alpha=alpha,
             max_points=max_points)
         self.distance = distance
-        self.weights = np.array(weights)/np.sum(weights)  # Normalize weights
+        self.weights = weights  # Store original weights for sklearn compatibility
+        self._normalized_weights = np.array(weights)/np.sum(weights)  # Normalized weights for computation
         # Keep a copy of init params for sklearn compatibility
         self._init_params = dict(distance=distance, weights=list(weights), dim=dim, tau=tau,
                                  stride=stride, maxdim=maxdim, sample=sample, thresh=thresh, alpha=alpha)
@@ -99,7 +100,8 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
         # Reset base class state
         super().__init__(dim=dim, tau=tau, stride=stride, maxdim=maxdim, sample=sample, thresh=thresh, alpha=alpha)
         self.distance = distance
-        self.weights = np.array(weights) / np.sum(weights)
+        self.weights = weights  # Store original weights
+        self._normalized_weights = np.array(weights) / np.sum(weights)  # Normalized weights
         return self
 
     def predict_proba_sample(self, xs):
@@ -138,8 +140,8 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
 
         #prob = np.exp(mean_dist_E) / (np.exp(mean_dist_E) + np.exp(mean_dist_N))
         # Ponderate distances with weights between homology dimensions
-        mean_dist_E = np.sum([w * d for w, d in zip(self.weights, mean_dist_E)])
-        mean_dist_N = np.sum([w * d for w, d in zip(self.weights, mean_dist_N)])
+        mean_dist_E = np.sum([w * d for w, d in zip(self._normalized_weights, mean_dist_E)])
+        mean_dist_N = np.sum([w * d for w, d in zip(self._normalized_weights, mean_dist_N)])
 
         # Just to be sure
         if mean_dist_E == np.inf and mean_dist_N == np.inf:

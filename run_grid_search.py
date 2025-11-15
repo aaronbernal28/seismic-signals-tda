@@ -206,7 +206,7 @@ def main():
     # =========================================================================
     # GRID SEARCH PARAMETERS
     # =========================================================================
-    n_iter = 10  # Number of random parameter combinations to try per model
+    n_iter = 100  # Number of random parameter combinations to try per model
     cv_folds = 3  # Number of cross-validation folds
     random_state = 28  # Random seed for reproducibility
     n_jobs = -1  # Number of parallel jobs for RandomizedSearchCV

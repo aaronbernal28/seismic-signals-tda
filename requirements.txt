@@ -1,7 +1,7 @@
 # Core scientific computing
-numpy==2.3.3
-pandas==2.3.3
-scipy==1.16.2
+numpy
+pandas
+scipy
 
 # Seismology and data acquisition
 obspy==1.4.2
@@ -10,8 +10,8 @@ obspy==1.4.2
 h5py==3.15.1
 
 # Visualization
-matplotlib==3.9.2
-seaborn==0.13.2
+matplotlib
+seaborn
 
 # Topological Data Analysis
 ripser==0.6.12

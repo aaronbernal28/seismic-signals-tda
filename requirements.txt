@@ -17,7 +17,6 @@ seaborn==0.13.2
 ripser==0.6.12
 persim==0.3.8
 gudhi==3.11.0
-giotto-tda==0.6.2
 
 # Machine Learning
 scikit-learn>=1.4.0

@@ -6,11 +6,11 @@ from persim import bottleneck
 from sklearn.metrics import roc_auc_score
 
 class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
-    def __init__(self, distance=bottleneck, weigths=[1], dim=100, tau=10, stride=1, maxdim=None, sample=10, thresh=np.inf, alpha=0.1, max_points=500):
+    def __init__(self, distance=bottleneck, weights=[1], dim=100, tau=10, stride=1, maxdim=None, sample=10, thresh=np.inf, alpha=0.1, max_points=500):
         """ Initialize the binary classification model.
         Args:
             distance: function to compute distance between persistence diagrams
-            weigths: List[float] weights for each homology dimension
+            weights: List[float] weights for each homology dimension
             dim: int, embedding dimension
             tau: int, time delay
             stride: int, stride for sliding window
@@ -18,10 +18,10 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
             thresh: float, threshold for diagram points
             alpha: float, weight for birth-death transformation
         """
-        # If maxdim is provided, ensure it matches len(weigths)-1
+        # If maxdim is provided, ensure it matches len(weights)-1
         if maxdim is None:
-            maxdim = len(weigths) - 1
-        assert len(weigths) == maxdim + 1, "Weights length must match maxdim + 1"
+            maxdim = len(weights) - 1
+        assert len(weights) == maxdim + 1, "Weights length must match maxdim + 1"
 
         super().__init__(
             dim=dim, tau=tau,
@@ -32,9 +32,9 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
             alpha=alpha,
             max_points=max_points)
         self.distance = distance
-        self.weigths = np.array(weigths)/np.sum(weigths)  # Normalize weights
+        self.weights = np.array(weights)/np.sum(weights)  # Normalize weights
         # Keep a copy of init params for sklearn compatibility
-        self._init_params = dict(distance=distance, weigths=list(weigths), dim=dim, tau=tau,
+        self._init_params = dict(distance=distance, weights=list(weights), dim=dim, tau=tau,
                                  stride=stride, maxdim=maxdim, sample=sample, thresh=thresh, alpha=alpha)
     
     def fit(self, X, y, verbose=False):
@@ -65,7 +65,7 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
         # Reflect any runtime changes
         params.update(dict(
             distance=self.distance,
-            weigths=list(self.weigths),
+            weights=list(self.weights),
             dim=self.dim,
             tau=self.tau,
             stride=self.stride,
@@ -83,7 +83,7 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
                 self._init_params[k] = v
         # Rebuild internal state if structural params changed
         distance = params.get('distance', self.distance)
-        weigths = params.get('weigths', list(self.weigths))
+        weights = params.get('weights', list(self.weights))
         dim = params.get('dim', self.dim)
         tau = params.get('tau', self.tau)
         stride = params.get('stride', self.stride)
@@ -93,13 +93,13 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
         alpha = params.get('alpha', self.alpha)
 
         # Validate weights vs maxdim
-        if len(weigths) != maxdim + 1:
+        if len(weights) != maxdim + 1:
             raise ValueError("Weights length must match maxdim + 1")
 
         # Reset base class state
         super().__init__(dim=dim, tau=tau, stride=stride, maxdim=maxdim, sample=sample, thresh=thresh, alpha=alpha)
         self.distance = distance
-        self.weigths = np.array(weigths) / np.sum(weigths)
+        self.weights = np.array(weights) / np.sum(weights)
         return self
 
     def predict_proba_sample(self, xs):
@@ -138,8 +138,8 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
 
         #prob = np.exp(mean_dist_E) / (np.exp(mean_dist_E) + np.exp(mean_dist_N))
         # Ponderate distances with weights between homology dimensions
-        mean_dist_E = np.sum([w * d for w, d in zip(self.weigths, mean_dist_E)])
-        mean_dist_N = np.sum([w * d for w, d in zip(self.weigths, mean_dist_N)])
+        mean_dist_E = np.sum([w * d for w, d in zip(self.weights, mean_dist_E)])
+        mean_dist_N = np.sum([w * d for w, d in zip(self.weights, mean_dist_N)])
 
         # Just to be sure
         if mean_dist_E == np.inf and mean_dist_N == np.inf:

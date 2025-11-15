@@ -206,10 +206,11 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-data/*
+data/processed/signal_intervals.csv
 scripts/sliding1.py
 scripts/sliding2.py
 scripts/ecg.py
 
 docs/*
 scripts/fps/*
+data/raw/events.xml

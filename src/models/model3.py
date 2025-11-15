@@ -6,12 +6,12 @@ from persim import bottleneck
 from sklearn.metrics import roc_auc_score
 
 class BinaryClassificationMFCC(PersistenceDiagramDatabaseMFCC):
-    def __init__(self, distance=bottleneck, weigths=[1], n_mfcc=40, sr=40.0, win_length_sec=0.3, 
+    def __init__(self, distance=bottleneck, weights=[1], n_mfcc=40, sr=40.0, win_length_sec=0.3, 
                  hop_length_sec=0.2, maxdim=None, sample=10, thresh=np.inf, alpha=0.1, max_points=500):
         """ Initialize the binary classification model using MFCC features.
         Args:
             distance: function to compute distance between persistence diagrams
-            weigths: List[float] weights for each homology dimension
+            weights: List[float] weights for each homology dimension
             n_mfcc: int, number of MFCC coefficients
             sr: float, sample rate of signals
             win_length_sec: float, window length in seconds for MFCC
@@ -21,10 +21,10 @@ class BinaryClassificationMFCC(PersistenceDiagramDatabaseMFCC):
             thresh: float, threshold for diagram points
             alpha: float, proportion of points to keep after FPS subsampling
         """
-        # If maxdim is provided, ensure it matches len(weigths)-1
+        # If maxdim is provided, ensure it matches len(weights)-1
         if maxdim is None:
-            maxdim = len(weigths) - 1
-        assert len(weigths) == maxdim + 1, "Weights length must match maxdim + 1"
+            maxdim = len(weights) - 1
+        assert len(weights) == maxdim + 1, "Weights length must match maxdim + 1"
 
         super().__init__(
             n_mfcc=n_mfcc,
@@ -38,9 +38,9 @@ class BinaryClassificationMFCC(PersistenceDiagramDatabaseMFCC):
             max_points=max_points
         )
         self.distance = distance
-        self.weigths = np.array(weigths) / np.sum(weigths)  # Normalize weights
+        self.weights = np.array(weights) / np.sum(weights)  # Normalize weights
         # Keep a copy of init params for sklearn compatibility
-        self._init_params = dict(distance=distance, weigths=list(weigths), n_mfcc=n_mfcc, sr=sr,
+        self._init_params = dict(distance=distance, weights=list(weights), n_mfcc=n_mfcc, sr=sr,
                                  win_length_sec=win_length_sec, hop_length_sec=hop_length_sec,
                                  maxdim=maxdim, sample=sample, thresh=thresh, alpha=alpha)
     
@@ -70,7 +70,7 @@ class BinaryClassificationMFCC(PersistenceDiagramDatabaseMFCC):
         params = dict(self._init_params)
         params.update(dict(
             distance=self.distance,
-            weigths=list(self.weigths),
+            weights=list(self.weights),
             n_mfcc=self.n_mfcc,
             sr=self.sr,
             win_length_sec=self.win_length / self.sr,
@@ -88,7 +88,7 @@ class BinaryClassificationMFCC(PersistenceDiagramDatabaseMFCC):
                 self._init_params[k] = v
 
         distance = params.get('distance', self.distance)
-        weigths = params.get('weigths', list(self.weigths))
+        weights = params.get('weights', list(self.weights))
         n_mfcc = params.get('n_mfcc', self.n_mfcc)
         sr = params.get('sr', self.sr)
         win_length_sec = params.get('win_length_sec', self.win_length / self.sr)
@@ -98,13 +98,13 @@ class BinaryClassificationMFCC(PersistenceDiagramDatabaseMFCC):
         thresh = params.get('thresh', self.thresh)
         alpha = params.get('alpha', self.alpha)
 
-        if len(weigths) != maxdim + 1:
+        if len(weights) != maxdim + 1:
             raise ValueError("Weights length must match maxdim + 1")
 
         super().__init__(n_mfcc=n_mfcc, sr=sr, win_length_sec=win_length_sec, hop_length_sec=hop_length_sec,
                          maxdim=maxdim, sample=sample, thresh=thresh, alpha=alpha)
         self.distance = distance
-        self.weigths = np.array(weigths) / np.sum(weigths)
+        self.weights = np.array(weights) / np.sum(weights)
         return self
 
     def predict_proba_sample(self, signal):
@@ -138,8 +138,8 @@ class BinaryClassificationMFCC(PersistenceDiagramDatabaseMFCC):
                 mean_dist_N.append(np.inf) 
 
         # Weighted sum across homology dimensions
-        mean_dist_E = np.sum([w * d for w, d in zip(self.weigths, mean_dist_E)])
-        mean_dist_N = np.sum([w * d for w, d in zip(self.weigths, mean_dist_N)])
+        mean_dist_E = np.sum([w * d for w, d in zip(self.weights, mean_dist_E)])
+        mean_dist_N = np.sum([w * d for w, d in zip(self.weights, mean_dist_N)])
 
         # Handle edge cases
         if mean_dist_E == np.inf and mean_dist_N == np.inf:

@@ -20,7 +20,7 @@ gudhi==3.11.0
 giotto-tda==0.6.2
 
 # Machine Learning
-scikit-learn==1.5.2
+scikit-learn
 
 # Audio processing
 librosa==0.10.2

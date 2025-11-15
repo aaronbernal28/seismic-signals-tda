@@ -76,11 +76,11 @@ Run the following code in a Google Colab notebook to set up the environment and 
 # Clone the repository
 !git clone https://github.com/aaronbernal28/seismic-signals-tda.git
 
+# Install dependencies (assuming there's a requirements.txt file in the repo)
+!pip install -r seismic-signals-tda/requirements.txt
+
 # Change to the repository directory
 %cd seismic-signals-tda
-
-# Install dependencies (assuming there's a requirements.txt file in the repo)
-!pip install -r requirements.txt
 
 # Run the grid search script
 !python run_grid_search.py

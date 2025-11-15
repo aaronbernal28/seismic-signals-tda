@@ -13,8 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.models.model2 import BinaryClassificationTE
 import src.utils as ut
 from sklearn.metrics import accuracy_score, roc_auc_score, classification_report
-from gudhi import bottleneck_distance
-
+from persim import wasserstein, bottleneck
 
 def main():
     """Main execution function."""
@@ -34,15 +33,15 @@ def main():
     print(f"{'=' * 70}")
     
     model = BinaryClassificationTE(
-        distance=bottleneck_distance,
+        distance=wasserstein,
         weigths=[1],
         dim=4,
         tau=10,
         stride=10,
-        maxdim=0,
-        sample=None,
+        sample=50,
         thresh=np.inf,
-        alpha=0.5
+        alpha=0.5,
+        max_points=100
     )
     
     # Training

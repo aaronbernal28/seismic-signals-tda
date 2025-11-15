@@ -5,7 +5,7 @@ from gtda.time_series import TakensEmbedding
 import librosa
 
 class PersistenceDiagramDatabaseTE:
-    def __init__(self, labels=[0, 1], dim=100, tau=10, stride=1, maxdim=2, sample=None, thresh=np.inf, alpha=0.1, max_points=500):
+    def __init__(self, labels=[0, 1], dim=100, tau=10, stride=1, maxdim=2, sample=None, thresh=np.inf, alpha=0.1, max_points=500, seed=28):
         """Initialize the persistence diagram database.
         Args:
             labels (list): List of unique identifiers for diagrams.
@@ -20,7 +20,7 @@ class PersistenceDiagramDatabaseTE:
         self.labels = labels
         self.maxdim = maxdim
         self.db = {label: {d: [] for d in range(maxdim + 1)} for label in labels}
-        self.seed = 28
+        self.seed = seed
         self.sample = sample
         self.thresh = thresh
         self.alpha = alpha
@@ -30,6 +30,8 @@ class PersistenceDiagramDatabaseTE:
         self.tau = tau
         self.stride = stride
         self.TE = TakensEmbedding(time_delay=tau, dimension=dim, stride=stride)
+        # RNG for sampling
+        self.rng = np.random.default_rng(self.seed)
 
     def add_signal(self, signal, label):
         """Compute and add the persistence diagram of a signal to the database.
@@ -58,8 +60,8 @@ class PersistenceDiagramDatabaseTE:
             list: List of persistence diagrams, each as np.ndarray of shape (~N, 2)
         """
         output = self.db[label][dim]  # Keep as list since diagrams have varying shapes
-        if self.sample is not None:
-            indices = np.random.choice(len(output), size=min(self.sample, len(output)), replace=False)
+        if self.sample is not None and len(output) > 0:
+            indices = self.rng.choice(len(output), size=min(self.sample, len(output)), replace=False)
             output = [output[i] for i in indices]
         return output
     
@@ -103,7 +105,7 @@ class PersistenceDiagramDatabaseTE:
 
 class PersistenceDiagramDatabaseMFCC:
     def __init__(self, labels=[0, 1], n_mfcc=40, sr=40.0, win_length_sec=0.3, hop_length_sec=0.2, 
-                 maxdim=2, sample=None, thresh=np.inf, alpha=0.1, max_points=500):
+                 maxdim=2, sample=None, thresh=np.inf, alpha=0.1, max_points=500, seed=28):
         """Initialize the persistence diagram database for MFCC features.
         Args:
             labels (list): List of unique identifiers for diagrams.
@@ -120,7 +122,7 @@ class PersistenceDiagramDatabaseMFCC:
         self.labels = labels
         self.maxdim = maxdim
         self.db = {label: {d: [] for d in range(maxdim + 1)} for label in labels}
-        self.seed = 28
+        self.seed = seed
         self.sample = sample
         self.thresh = thresh
         self.alpha = alpha
@@ -131,6 +133,8 @@ class PersistenceDiagramDatabaseMFCC:
         self.sr = sr
         self.win_length = int(win_length_sec * sr)
         self.hop_length = max(1, int(hop_length_sec * sr))
+        # RNG for sampling
+        self.rng = np.random.default_rng(self.seed)
 
     def add_signal(self, signal, label):
         """Compute and add the persistence diagram of a signal to the database.
@@ -159,8 +163,8 @@ class PersistenceDiagramDatabaseMFCC:
             list: List of persistence diagrams, each as np.ndarray of shape (~N, 2)
         """
         output = self.db[label][dim]  # Keep as list since diagrams have varying shapes
-        if self.sample is not None:
-            indices = np.random.choice(len(output), size=min(self.sample, len(output)), replace=False)
+        if self.sample is not None and len(output) > 0:
+            indices = self.rng.choice(len(output), size=min(self.sample, len(output)), replace=False)
             output = [output[i] for i in indices]
         return output
     
@@ -183,7 +187,7 @@ class PersistenceDiagramDatabaseMFCC:
                 n_mfcc=self.n_mfcc,
                 n_fft=self.win_length,
                 hop_length=self.hop_length,
-                n_mels=128,
+                n_mels=20,
                 dct_type=2,
                 norm='ortho',
                 center=False
@@ -195,8 +199,8 @@ class PersistenceDiagramDatabaseMFCC:
                 width -= 1
             width = max(3, width)
             
-            mfcc_delta = librosa.feature.delta(mfcc, width=width, mode='nearest', order=1)
-            mfcc_delta_delta = librosa.feature.delta(mfcc, width=width, mode='nearest', order=2)
+            mfcc_delta = librosa.feature.delta(mfcc, mode='mirror', order=1)
+            mfcc_delta_delta = librosa.feature.delta(mfcc, mode='mirror', order=2)
             
             # Concatenate MFCC, delta, and delta-delta
             mfcc_combined = np.concatenate((mfcc, mfcc_delta, mfcc_delta_delta), axis=0)

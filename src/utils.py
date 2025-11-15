@@ -25,11 +25,13 @@ def plot_waveform(signal, label='Earthquake', mag=0):
 
 class SeismicDataset:
     """Dataset class for seismic signals."""
-    def __init__(self, data_path=r"data\processed\signals_train.hdf5"):
+    def __init__(self, data_path=r"data\processed\signals_train.hdf5", seed=None):
         self.data_path = Path(data_path)
         self.signals = []
         self.labels = []
         self.mags = []
+        # Per-instance RNG; no global reseeding
+        self.rng = np.random.default_rng(seed)
         self._load_data()
 
     def _load_data(self):
@@ -68,10 +70,9 @@ class SeismicDataset:
                 self.labels.append(label)
                 self.mags.append(mag)
         
-        # Shuffle the data randomly
-        np.random.seed(28)  # For reproducibility
+        # Shuffle the data using per-instance RNG (optional reproducibility via seed)
         indices = np.arange(len(self.signals))
-        np.random.shuffle(indices)
+        self.rng.shuffle(indices)
         self.signals = [self.signals[i] for i in indices]
         self.labels = [self.labels[i] for i in indices]
         self.mags = [self.mags[i] for i in indices]
@@ -167,7 +168,7 @@ def compute_distances(dgm1, dgm2):
     """
     return ecg.compute_distances(dgm1, dgm2)
 
-def load_datasets(train_path=None, test_path=None):
+def load_datasets(train_path=None, test_path=None, seed=None):
     """Load training and test datasets.
     
     Args:
@@ -186,8 +187,8 @@ def load_datasets(train_path=None, test_path=None):
     print("Loading Datasets")
     print("=" * 70)
     
-    train_dataset = SeismicDataset(data_path=Path(train_path))
-    test_dataset = SeismicDataset(data_path=Path(test_path))
+    train_dataset = SeismicDataset(data_path=Path(train_path), seed=seed)
+    test_dataset = SeismicDataset(data_path=Path(test_path), seed=seed)
     
     X_train, y_train, mag_train = train_dataset.get_data()
     X_test, y_test, mag_test = test_dataset.get_data()

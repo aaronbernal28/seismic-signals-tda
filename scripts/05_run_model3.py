@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.models.model3 import BinaryClassificationMFCC
 import src.utils as ut
 from sklearn.metrics import accuracy_score, roc_auc_score, classification_report
-from gudhi import bottleneck_distance
+from persim import wasserstein
 
 
 def main():
@@ -34,16 +34,16 @@ def main():
     print(f"{'=' * 70}")
     
     model = BinaryClassificationMFCC(
-        distance=bottleneck_distance,
-        weigths=[5, 3, 1],
-        n_mfcc=40,
+        distance=wasserstein,
+        weigths=[1, 1],
+        n_mfcc=20,
         sr=40.0,
-        win_length_sec=0.3,
+        win_length_sec=0.6,
         hop_length_sec=0.2,
-        maxdim=2,
-        sample=None,
+        sample=50,
         thresh=np.inf,
-        alpha=1
+        alpha=0.5,
+        max_points=100
     )
     
     # Training

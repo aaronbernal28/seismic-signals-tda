@@ -14,9 +14,7 @@ from src.models.model3 import BinaryClassificationMFCC
 import src.utils as ut
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.metrics import make_scorer, roc_auc_score
-from persim import wasserstein
-from gudhi import bottleneck_distance
-
+from persim import wasserstein, bottleneck
 
 def randomized_search_te(X, y, param_distributions, n_iter=10, cv=3, random_state=28, n_jobs=1):
     """Randomized search for BinaryClassificationTE using sklearn's RandomizedSearchCV.
@@ -179,28 +177,30 @@ def main():
     # =========================================================================
     
     # Parameter distributions for BinaryClassificationTE (Takens Embedding)
+    param_distributions = {
+        'distance': [wasserstein, bottleneck],  # distance metric between persistence diagrams
+        'weigths': [[1], [2, 1]],  # Weights for distance calculation, the length depends on homology dimensions used
+        'sample': [10, 20, 30, None],  # Number of diagrams to sample
+        'thresh': [np.inf, 5000, 10000],  # Threshold
+        'alpha': [0.25, 0.5, 0.75, 1.0],  # FPS subsampling proportion
+        'max_points': [100, 200, 300, np.inf],  # Maximum number of Takens points
+        'seed': [28]  # Random seed for reproducibility
+    }
+
+    # Parameter distributions for BinaryClassificationTE (Takens Embedding)
     param_distributions_te = {
-        'distance': [bottleneck_distance],  # or [wasserstein, bottleneck_distance]
-        'weigths': [[1]],  # e.g., [[1]], [[2, 1]], [[1, 1]]
-        'dim': [],  # Takens embedding dimension, e.g., [3, 4, 5, 10, 20]
-        'tau': [],  # Time delay, e.g., [5, 10, 15, 20]
-        'stride': [],  # Stride, e.g., [1, 2, 5, 10]
-        'sample': [],  # Number of diagrams to sample, e.g., [10, 20, 30, None]
-        'thresh': [],  # Threshold, e.g., [np.inf, 1000, 3000]
-        'alpha': []  # FPS subsampling proportion, e.g., [0.1, 0.3, 0.5, 1.0]
+        **param_distributions,
+        'dim': [3, 4, 5, 10, 20],  # Takens embedding dimension
+        'tau': [3, 4, 5, 10],  # Time delay
+        'stride': [1, 2],  # Stride
     }
     
     # Parameter distributions for BinaryClassificationMFCC (MFCC Features)
     param_distributions_mfcc = {
-        'distance': [bottleneck_distance],  # or [wasserstein, bottleneck_distance]
-        'weigths': [[2, 1]],  # e.g., [[1]], [[2, 1]], [[1, 1]], [[1, 1, 1]]
-        'n_mfcc': [],  # Number of MFCC coefficients, e.g., [13, 20, 40, 60]
-        'win_length_sec': [],  # Window length in seconds, e.g., [0.2, 0.3, 0.4]
-        'hop_length_sec': [],  # Hop length in seconds, e.g., [0.1, 0.15, 0.2]
-        'sample': [],  # Number of diagrams to sample, e.g., [10, 20, 30, None]
-        'thresh': [],  # Threshold, e.g., [np.inf, 1000, 3000]
-        'alpha': [],  # FPS subsampling proportion, e.g., [0.1, 0.3, 0.5, 0.7, 1.0]
-        'max_points': []  # Maximum number of MFCC frames, e.g., [100, 200, 300, np.inf]  
+        **param_distributions,
+        'n_mfcc': [13, 20, 40, 60],  # Number of MFCC coefficients
+        'win_length_sec': [0.2, 0.3, 0.4],  # Window length win_length = int(sr * win_length_sec)
+        'hop_length_sec': [0.1, 0.15, 0.2],  # Hop length hop_length = int(sr * hop_length_sec)
     }
     
     # =========================================================================
@@ -209,7 +209,7 @@ def main():
     n_iter = 10  # Number of random parameter combinations to try per model
     cv_folds = 3  # Number of cross-validation folds
     random_state = 28  # Random seed for reproducibility
-    n_jobs = 4  # Number of parallel jobs for RandomizedSearchCV
+    n_jobs = 8  # Number of parallel jobs for RandomizedSearchCV
     
     # =========================================================================
     # RUN RANDOMIZED SEARCH FOR MODEL 2 (Takens Embedding)

@@ -24,14 +24,3 @@ scikit-learn==1.5.2
 
 # Audio processing
 librosa==0.10.2
-
-# Geospatial
-geopandas==1.1.1
-
-# Jupyter notebook support
-ipykernel==6.29.5
-ipywidgets==8.1.5
-jupyter-client==8.6.2
-jupyter-core==5.7.2
-jupyterlab==4.3.5
-jupyterlab-widgets==3.0.13

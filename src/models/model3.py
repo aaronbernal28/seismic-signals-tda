@@ -1,22 +1,25 @@
-""" Binary classification model implementation. """
+""" Binary classification model implementation using MFCC features instead of Takens embeddings. """
 
 import numpy as np
-from src.databases import PersistenceDiagramDatabaseTE
+from src.databases import PersistenceDiagramDatabaseMFCC
 from persim import bottleneck
 from sklearn.metrics import roc_auc_score
 
-class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
-    def __init__(self, distance=bottleneck, weigths=[1], dim=100, tau=10, stride=1, maxdim=None, sample=10, thresh=np.inf, alpha=0.1, max_points=500):
-        """ Initialize the binary classification model.
+class BinaryClassificationMFCC(PersistenceDiagramDatabaseMFCC):
+    def __init__(self, distance=bottleneck, weigths=[1], n_mfcc=40, sr=40.0, win_length_sec=0.3, 
+                 hop_length_sec=0.2, maxdim=None, sample=10, thresh=np.inf, alpha=0.1, max_points=500):
+        """ Initialize the binary classification model using MFCC features.
         Args:
             distance: function to compute distance between persistence diagrams
             weigths: List[float] weights for each homology dimension
-            dim: int, embedding dimension
-            tau: int, time delay
-            stride: int, stride for sliding window
+            n_mfcc: int, number of MFCC coefficients
+            sr: float, sample rate of signals
+            win_length_sec: float, window length in seconds for MFCC
+            hop_length_sec: float, hop length in seconds for MFCC
+            maxdim: int, maximum homology dimension to compute
             sample: int or None, number of diagrams to sample for distance computation
             thresh: float, threshold for diagram points
-            alpha: float, weight for birth-death transformation
+            alpha: float, proportion of points to keep after FPS subsampling
         """
         # If maxdim is provided, ensure it matches len(weigths)-1
         if maxdim is None:
@@ -24,27 +27,31 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
         assert len(weigths) == maxdim + 1, "Weights length must match maxdim + 1"
 
         super().__init__(
-            dim=dim, tau=tau,
-            stride=stride,
+            n_mfcc=n_mfcc,
+            sr=sr,
+            win_length_sec=win_length_sec,
+            hop_length_sec=hop_length_sec,
             maxdim=maxdim,
             sample=sample,
             thresh=thresh,
             alpha=alpha,
-            max_points=max_points)
+            max_points=max_points
+        )
         self.distance = distance
-        self.weigths = np.array(weigths)/np.sum(weigths)  # Normalize weights
+        self.weigths = np.array(weigths) / np.sum(weigths)  # Normalize weights
         # Keep a copy of init params for sklearn compatibility
-        self._init_params = dict(distance=distance, weigths=list(weigths), dim=dim, tau=tau,
-                                 stride=stride, maxdim=maxdim, sample=sample, thresh=thresh, alpha=alpha)
+        self._init_params = dict(distance=distance, weigths=list(weigths), n_mfcc=n_mfcc, sr=sr,
+                                 win_length_sec=win_length_sec, hop_length_sec=hop_length_sec,
+                                 maxdim=maxdim, sample=sample, thresh=thresh, alpha=alpha)
     
     def fit(self, X, y, verbose=False):
         """ Fit the binary classification model. 
         Args:
-            X: List[ndarray] (n_samples, ~n_signals)
+            X: List[ndarray] - each element is a 1D signal
             y: List[int] of labels (0 or 1)
         """
-        for i, (xs, yi) in enumerate(zip(X, y)):
-            self.add_signal(xs, label=yi)
+        for i, (signal, yi) in enumerate(zip(X, y)):
+            self.add_signal(signal, label=yi)
             if verbose and (i % 10 == 0):
                 print(f"Added signal {i}/{len(y)}", end='\r')
         
@@ -54,21 +61,20 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
                     pc_len = []
                     for diagrams in self.get_diagrams(label=label, dim=d):
                         pc_len.append(len(diagrams))
-                    # Print statistics
                     if pc_len:
                         print(f"Label {label}, Dim {d}: Mean diagram size: {np.mean(pc_len):.2f}, Std: {np.std(pc_len):.2f}, Max: {np.max(pc_len)}, Min: {np.min(pc_len)}")
-        print("Model fitting complete." )
+        print("Model fitting complete.")
 
     # --- Scikit-learn compatibility ---
     def get_params(self, deep=True):
         params = dict(self._init_params)
-        # Reflect any runtime changes
         params.update(dict(
             distance=self.distance,
             weigths=list(self.weigths),
-            dim=self.dim,
-            tau=self.tau,
-            stride=self.stride,
+            n_mfcc=self.n_mfcc,
+            sr=self.sr,
+            win_length_sec=self.win_length / self.sr,
+            hop_length_sec=self.hop_length / self.sr,
             maxdim=self.maxdim,
             sample=self.sample,
             thresh=self.thresh,
@@ -77,56 +83,51 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
         return params
 
     def set_params(self, **params):
-        # Update known params
         for k, v in params.items():
             if k in self._init_params:
                 self._init_params[k] = v
-        # Rebuild internal state if structural params changed
+
         distance = params.get('distance', self.distance)
         weigths = params.get('weigths', list(self.weigths))
-        dim = params.get('dim', self.dim)
-        tau = params.get('tau', self.tau)
-        stride = params.get('stride', self.stride)
+        n_mfcc = params.get('n_mfcc', self.n_mfcc)
+        sr = params.get('sr', self.sr)
+        win_length_sec = params.get('win_length_sec', self.win_length / self.sr)
+        hop_length_sec = params.get('hop_length_sec', self.hop_length / self.sr)
         maxdim = params.get('maxdim', self.maxdim)
         sample = params.get('sample', self.sample)
         thresh = params.get('thresh', self.thresh)
         alpha = params.get('alpha', self.alpha)
 
-        # Validate weights vs maxdim
         if len(weigths) != maxdim + 1:
             raise ValueError("Weights length must match maxdim + 1")
 
-        # Reset base class state
-        super().__init__(dim=dim, tau=tau, stride=stride, maxdim=maxdim, sample=sample, thresh=thresh, alpha=alpha)
+        super().__init__(n_mfcc=n_mfcc, sr=sr, win_length_sec=win_length_sec, hop_length_sec=hop_length_sec,
+                         maxdim=maxdim, sample=sample, thresh=thresh, alpha=alpha)
         self.distance = distance
         self.weigths = np.array(weigths) / np.sum(weigths)
         return self
 
-    def predict_proba_sample(self, xs):
+    def predict_proba_sample(self, signal):
         """ Predict the probability for a single sample.
         Args:
-            xs: ndarray (~n_signals,)
+            signal: ndarray - 1D signal array
         Returns:
             prob: float in [0, 1]
         """
-        # Compute persistence diagram for the input signal
         try:
-            xs_dgm = self.transform(xs)
+            xs_dgm = self.transform(signal)
         except Exception as e:
             print(f"Error transforming the input signal: {e}")
-            return 0.5  # Return a neutral probability in case of error
+            return 0.5
 
         mean_dist_E = []
         mean_dist_N = []
 
         for d in range(self.maxdim + 1):
-            # Only proceed if there are points in the diagram
             if len(xs_dgm[d]) > 0:
-                # Retrieve diagrams from the database
                 E_h0 = self.get_diagrams(label=1, dim=d)
                 N_h0 = self.get_diagrams(label=0, dim=d)
-                #print(f"Dimension {d}: {len(E_h0)} diagrams for class 1, {len(N_h0)} diagrams for class 0.", end='\r')
-                # Compute distances
+                
                 dists_E = [self.distance(xs_dgm[d], dgm) for dgm in E_h0]
                 dists_N = [self.distance(xs_dgm[d], dgm) for dgm in N_h0]
 
@@ -136,12 +137,11 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
                 mean_dist_E.append(np.inf) 
                 mean_dist_N.append(np.inf) 
 
-        #prob = np.exp(mean_dist_E) / (np.exp(mean_dist_E) + np.exp(mean_dist_N))
-        # Ponderate distances with weights between homology dimensions
+        # Weighted sum across homology dimensions
         mean_dist_E = np.sum([w * d for w, d in zip(self.weigths, mean_dist_E)])
         mean_dist_N = np.sum([w * d for w, d in zip(self.weigths, mean_dist_N)])
 
-        # Just to be sure
+        # Handle edge cases
         if mean_dist_E == np.inf and mean_dist_N == np.inf:
             prob = 0.5
         elif mean_dist_E == np.inf and mean_dist_N < np.inf:
@@ -155,17 +155,17 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
     def predict_proba(self, X):
         """ Predict probabilities for multiple samples.
         Args:
-            X: List[ndarray] (n_samples, ~n_signals)
+            X: List[ndarray] - each element is a 1D signal
         Returns:
             probs: List[float] of probabilities in [0, 1]
         """
-        probs = [self.predict_proba_sample(xs) for xs in X]
+        probs = [self.predict_proba_sample(signal) for signal in X]
         return probs
 
     def predict(self, X):
         """ Predict class labels for multiple samples.
         Args:
-            X: List[ndarray] (n_samples, ~n_signals)
+            X: List[ndarray] - each element is a 1D signal
         Returns:
             labels: List[int] of predicted labels (0 or 1)
         """
@@ -176,7 +176,7 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
     def score(self, X, y):
         """ Compute the ROC AUC score.
         Args:
-            X: List[ndarray] (n_samples, ~n_signals)
+            X: List[ndarray] - each element is a 1D signal
             y: List[int] of true labels (0 or 1)
         Returns:
             auc: float ROC AUC score
@@ -184,3 +184,4 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE):
         probs = self.predict_proba(X)
         auc = roc_auc_score(y, probs)
         return auc
+    

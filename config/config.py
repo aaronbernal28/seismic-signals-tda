@@ -24,3 +24,10 @@ PROCESSED_DATA_PATH = "./data/processed/"
 # Train and test paths
 TRAIN_DATA_PATH = "./data/processed/signals_train.hdf5"
 TEST_DATA_PATH = "./data/processed/signals_test.hdf5"
+
+# Event interval generation parameters
+EVENT_INTERVAL_START_OFFSET_MIN = 10    # seconds before event
+EVENT_INTERVAL_START_OFFSET_MAX = 30    # seconds before event
+EVENT_INTERVAL_END_OFFSET_MIN = 30     # seconds after event
+EVENT_INTERVAL_END_OFFSET_MAX = 60     # seconds after event
+NON_EVENT_INTERVAL_DURATION = EVENT_INTERVAL_START_OFFSET_MAX + EVENT_INTERVAL_END_OFFSET_MAX # seconds

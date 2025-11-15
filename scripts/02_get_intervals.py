@@ -15,6 +15,10 @@ from obspy import read_events
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config.config import RAW_DATA_PATH, PROCESSED_DATA_PATH, START_TIME, END_TIME
+from config.config import (
+    EVENT_INTERVAL_START_OFFSET_MIN, EVENT_INTERVAL_START_OFFSET_MAX,
+    EVENT_INTERVAL_END_OFFSET_MIN, EVENT_INTERVAL_END_OFFSET_MAX
+)
 from src.preprocess import extract_event_data, create_event_intervals, generate_non_event_intervals
 
 
@@ -51,8 +55,8 @@ def main():
         
         # Create event intervals (label=1)
         print("\nGenerating event intervals (label=1)...")
-        print("  Start offset: uniform(10, 90) seconds before event")
-        print("  End offset: uniform(-30, 120) seconds after event")
+        print(f"  Start offset: uniform({EVENT_INTERVAL_START_OFFSET_MIN}, {EVENT_INTERVAL_START_OFFSET_MAX}) seconds before event")
+        print(f"  End offset: uniform({EVENT_INTERVAL_END_OFFSET_MIN}, {EVENT_INTERVAL_END_OFFSET_MAX}) seconds after event")
         event_intervals_df = create_event_intervals(events_df)
         print(f"✓ Created {len(event_intervals_df)} event intervals")
         print(f"  Duration range: {event_intervals_df['duration'].min():.1f}s to {event_intervals_df['duration'].max():.1f}s")

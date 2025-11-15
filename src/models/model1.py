@@ -7,7 +7,7 @@ For simplicity:
 
 import numpy as np
 import pandas as pd
-from src.databases import PersistenceDiagramDatabase
+from src.databases import PersistenceDiagramDatabaseTE
 from src.utils import takens_embedding, compute_persistence
 from persim import wasserstein, bottleneck
 from sklearn.metrics import roc_auc_score
@@ -16,7 +16,7 @@ class BinaryClassificationModel:
     def __init__(self, dim=100, tau=10, distance=bottleneck, alpha=0.2):
         self.dim = dim
         self.tau = tau
-        self.db = PersistenceDiagramDatabase(labels=[0, 1], dim=dim, tau=tau, maxdim=0, sample=None, alpha=alpha)
+        self.db = PersistenceDiagramDatabaseTE(labels=[0, 1], dim=dim, tau=tau, maxdim=0, sample=None, alpha=alpha)
         self.distance = distance
     
     def fit(self, X, y, verbose=False):

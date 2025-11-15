@@ -12,6 +12,13 @@ from obspy.geodetics import locations2degrees
 from obspy.core.event import Catalog
 from obspy import UTCDateTime
 import warnings
+from config.config import (
+    EVENT_INTERVAL_START_OFFSET_MIN,
+    EVENT_INTERVAL_START_OFFSET_MAX,
+    EVENT_INTERVAL_END_OFFSET_MIN,
+    EVENT_INTERVAL_END_OFFSET_MAX,
+    NON_EVENT_INTERVAL_DURATION
+)
 
 
 # ============================================================================
@@ -146,8 +153,8 @@ def extract_event_data(catalog):
 def create_event_intervals(events_df):
     """
     Create time intervals for each event (label=1) with random durations.
-    Start offset: uniform(-10, -90) seconds before event
-    End offset: uniform(-30, 120) seconds after event
+    Start offset: uniform(EVENT_INTERVAL_START_OFFSET_MIN, EVENT_INTERVAL_START_OFFSET_MAX) seconds before event
+    End offset: uniform(EVENT_INTERVAL_END_OFFSET_MIN, EVENT_INTERVAL_END_OFFSET_MAX) seconds after event
     
     Parameters:
     -----------
@@ -168,8 +175,8 @@ def create_event_intervals(events_df):
             event_time = event['date']
         
         # Calculate interval boundaries with random offsets
-        start_offset = np.random.uniform(10, 90)  # seconds before event
-        end_offset = np.random.uniform(-30, 120)  # seconds after event
+        start_offset = np.random.uniform(EVENT_INTERVAL_START_OFFSET_MIN, EVENT_INTERVAL_START_OFFSET_MAX)  # seconds before event
+        end_offset = np.random.uniform(EVENT_INTERVAL_END_OFFSET_MIN, EVENT_INTERVAL_END_OFFSET_MAX)  # seconds after event
         
         start_time = event_time - timedelta(seconds=start_offset)
         end_time = event_time + timedelta(seconds=end_offset)
@@ -257,8 +264,8 @@ def generate_non_event_intervals(event_intervals_df, global_start, global_end, n
         attempts += 1
         
         # Generate random duration similar to event intervals
-        start_offset = np.random.uniform(10, 90)
-        end_offset = np.random.uniform(-30, 120)
+        start_offset = np.random.uniform(EVENT_INTERVAL_START_OFFSET_MIN, EVENT_INTERVAL_START_OFFSET_MAX)
+        end_offset = np.random.uniform(EVENT_INTERVAL_END_OFFSET_MIN, EVENT_INTERVAL_END_OFFSET_MAX)
         duration = start_offset + end_offset  # Total duration
         
         # Ensure minimum duration of 40 seconds

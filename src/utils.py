@@ -11,7 +11,7 @@ def plot_waveform(signal, label='Earthquake', mag=0):
     time = np.arange(len(signal))  # Assume time steps starting from 0
     plt.plot(time, signal, linewidth=0.5, color='darkblue')
     plt.title(f'{label} - Mag: {mag}', fontsize=11, fontweight='bold')
-    plt.xlabel('Time (seconds)', fontsize=10)
+    plt.xlabel('Step (40Hz/s)', fontsize=10)
     plt.ylabel('Amplitude', fontsize=10)
     plt.grid(True, alpha=0.3)
     
@@ -166,3 +166,36 @@ def compute_distances(dgm1, dgm2):
         tuple: (bottleneck_distance, wasserstein_distance). Returns (inf, inf) if either diagram is empty.
     """
     return ecg.compute_distances(dgm1, dgm2)
+
+def load_datasets(train_path=None, test_path=None):
+    """Load training and test datasets.
+    
+    Args:
+        train_path: Path to training dataset (default: from config)
+        test_path: Path to test dataset (default: from config)
+    
+    Returns:
+        tuple: (X_train, y_train, X_test, y_test)
+    """
+    if train_path is None:
+        train_path = TRAIN_DATA_PATH
+    if test_path is None:
+        test_path = TEST_DATA_PATH
+    
+    print("=" * 70)
+    print("Loading Datasets")
+    print("=" * 70)
+    
+    train_dataset = SeismicDataset(data_path=Path(train_path))
+    test_dataset = SeismicDataset(data_path=Path(test_path))
+    
+    X_train, y_train, mag_train = train_dataset.get_data()
+    X_test, y_test, mag_test = test_dataset.get_data()
+    
+    print(f"✓ Datasets loaded successfully")
+    print(f"  Train: {len(train_dataset)} signals")
+    print(f"  Test: {len(test_dataset)} signals")
+    print(f"  Train labels: {np.bincount(y_train)}")
+    print(f"  Test labels: {np.bincount(y_test)}")
+    
+    return X_train, y_train, X_test, y_test

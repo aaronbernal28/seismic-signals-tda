@@ -16,14 +16,22 @@ seismic-signals-tda/
 ├── config/              # Configuration files and parameters
 ├── data/
 │   ├── raw/            # Raw seismic event data (XML format)
-│   └── processed/      # Preprocessed signals in HDF5 format
+│   ├── processed/      # Preprocessed signals in HDF5 format
+│   └── results/        # Model results and outputs
+├── docs/               # Documentation
 ├── notebooks/          # Jupyter notebooks for experiments and analysis
 ├── scripts/            # Data acquisition and preprocessing scripts
-└── src/
-    ├── databases.py    # Persistence diagram database implementation
-    ├── preprocess.py   # Signal preprocessing utilities
-    ├── utils.py        # General utility functions
-    └── models/         # Classification models using TDA features
+│   └── fps/           # Farthest Point Sampling examples
+├── src/
+│   ├── databases.py    # Persistence diagram database implementation
+│   ├── preprocess.py   # Signal preprocessing utilities
+│   ├── utils.py        # General utility functions
+│   ├── ecg.py         # ECG signal utilities
+│   └── models/         # Classification models using TDA features
+│       ├── model1.py
+│       ├── model2.py
+│       └── model3.py
+└── run_grid_search.py  # Grid search for hyperparameter tuning
 ```
 
 ## Methodology
@@ -61,6 +69,22 @@ pip install -r requirements.txt
 
 2. Explore notebooks for analysis and model training:
    - `07_model2.ipynb`: Binary classification using persistence diagram databases
+
+## Colab
+Run the following code in a Google Colab notebook to set up the environment and execute the grid search for model training:
+```python
+# Clone the repository
+!git clone https://github.com/aaronbernal28/seismic-signals-tda.git
+
+# Change to the repository directory
+%cd seismic-signals-tda
+
+# Install dependencies (assuming there's a requirements.txt file in the repo)
+!pip install -r requirements.txt
+
+# Run the grid search script
+!python run_grid_search.py
+```
 
 ## References
 

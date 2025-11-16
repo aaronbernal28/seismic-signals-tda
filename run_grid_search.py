@@ -15,6 +15,7 @@ import src.utils as ut
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.metrics import make_scorer, roc_auc_score
 from persim import wasserstein, bottleneck
+from src.cache import get_cache
 
 def randomized_search_te(X, y, param_distributions, n_iter=10, cv=3, random_state=28, n_jobs=1):
     """Randomized search for BinaryClassificationTE using sklearn's RandomizedSearchCV.
@@ -172,7 +173,7 @@ def main():
     np.random.seed(28)
     
     # Load datasets
-    X_train, y_train, _, _ = ut.load_datasets(max_samples=None)
+    X_train, y_train, _, _ = ut.load_datasets(max_samples=30)
     
     # =========================================================================
     # HYPERPARAMETER DISTRIBUTIONS - TO BE COMPLETED
@@ -181,12 +182,12 @@ def main():
     # Parameter distributions for BinaryClassificationTE (Takens Embedding)
     param_distributions = {
         'distance': [wasserstein, bottleneck],  # distance metric between persistence diagrams
-        'weights': [(1,), (1, 1), (2, 1), (1, 0.5)],  # Weights for distance calculation - use tuples for compatibility
+        'weights': [(1,), (1, 1), (2, 1), (1, 2)],  # Weights for distance calculation - use tuples for compatibility
         'maxdim': [0, 1],  # Maximum homology dimension (0=only H0, 1=H0+H1)
         'sample': [20],  # Number of diagrams to sample
-        'thresh': [1000, 5000, 10000],  # Threshold
-        'alpha': [0.25, 0.5, 0.75, 1.0],  # FPS subsampling proportion
-        'max_points': [100, 200, 300],  # Maximum number of Takens points
+        'thresh': [1000, 2000],  # Threshold
+        'alpha': [0.25, 0.5, 0.75],  # FPS subsampling proportion
+        'max_points': [100, 200],  # Maximum number of Takens points
         'seed': [28]  # Random seed for reproducibility
     }
 
@@ -201,15 +202,15 @@ def main():
     # Parameter distributions for BinaryClassificationMFCC (MFCC Features)
     param_distributions_mfcc = {
         **param_distributions,
-        'n_mfcc': [13, 20, 40, 60],  # Number of MFCC coefficients
-        'win_length_sec': [0.2, 0.3, 0.4],  # Window length win_length = int(sr * win_length_sec)
+        'n_mfcc': [10, 20],  # Number of MFCC coefficients
+        'win_length_sec': [0.6, 0.3, 0.4],  # Window length win_length = int(sr * win_length_sec)
         'hop_length_sec': [0.1, 0.15, 0.2],  # Hop length hop_length = int(sr * hop_length_sec)
     }
     
     # =========================================================================
     # GRID SEARCH PARAMETERS
     # =========================================================================
-    n_iter = 100  # Number of random parameter combinations to try per model
+    n_iter = 3  # Number of random parameter combinations to try per model
     cv_folds = 3  # Number of cross-validation folds
     random_state = 28  # Random seed for reproducibility
     n_jobs = -1  # Number of parallel jobs for RandomizedSearchCV
@@ -235,6 +236,9 @@ def main():
     results_te.to_csv(output_path_te, index=False)
     print(f"\n✓ Results saved to: {output_path_te}")
     
+    # Print cache statistics after TE
+    get_cache().print_stats()
+    
     # =========================================================================
     # RUN RANDOMIZED SEARCH FOR MODEL 3 (MFCC)
     # =========================================================================
@@ -255,6 +259,9 @@ def main():
     output_path_mfcc.parent.mkdir(exist_ok=True)
     results_mfcc.to_csv(output_path_mfcc, index=False)
     print(f"\n✓ Results saved to: {output_path_mfcc}")
+    
+    # Print final cache statistics
+    get_cache().print_stats()
     
     # =========================================================================
     # SUMMARY

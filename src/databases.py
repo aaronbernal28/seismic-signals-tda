@@ -3,6 +3,7 @@ from src.utils import compute_persistence
 from gudhi.subsampling import choose_n_farthest_points as fps
 from gtda.time_series import TakensEmbedding
 import librosa
+from src.cache import get_cache
 
 class PersistenceDiagramDatabaseTE:
     def __init__(self, labels=[0, 1], dim=100, tau=10, stride=1, maxdim=2, sample=None, thresh=np.inf, alpha=0.1, max_points=500, seed=28):
@@ -72,6 +73,15 @@ class PersistenceDiagramDatabaseTE:
         Returns:
             list: List of persistence diagrams, each as np.ndarray of shape (~N, 2)
         """
+        # Check cache first
+        cache = get_cache()
+        cached = cache.get_te(
+            signal, self.dim, self.tau, self.stride,
+            self.maxdim, self.thresh, self.alpha, self.max_points
+        )
+        if cached is not None:
+            return cached
+        
         # Compute Takens' embedding
         try:
             # TakensEmbedding expects 2D input: (n_samples, n_timestamps)
@@ -100,6 +110,14 @@ class PersistenceDiagramDatabaseTE:
         
         # Compute persistence diagrams
         diagrams = compute_persistence(embedded_sparse, maxdim=self.maxdim, thresh=self.thresh)
+        
+        # Store in cache
+        cache.put_te(
+            signal, self.dim, self.tau, self.stride,
+            self.maxdim, self.thresh, self.alpha, self.max_points,
+            diagrams
+        )
+        
         return diagrams
     
 
@@ -181,6 +199,14 @@ class PersistenceDiagramDatabaseMFCC:
         Returns:
             list: List of persistence diagrams, each as np.ndarray of shape (~N, 2)
         """
+        # Check cache first
+        cache = get_cache()
+        cached = cache.get_mfcc(
+            signal, self.n_mfcc, self.sr, self.win_length, self.hop_length,
+            self.maxdim, self.thresh, self.alpha, self.max_points
+        )
+        if cached is not None:
+            return cached
         
         try:
             # Convert signal to float32
@@ -231,4 +257,12 @@ class PersistenceDiagramDatabaseMFCC:
         
         # Compute persistence diagrams
         diagrams = compute_persistence(point_cloud_sparse, maxdim=self.maxdim, thresh=self.thresh)
+        
+        # Store in cache
+        cache.put_mfcc(
+            signal, self.n_mfcc, self.sr, self.win_length, self.hop_length,
+            self.maxdim, self.thresh, self.alpha, self.max_points,
+            diagrams
+        )
+        
         return diagrams

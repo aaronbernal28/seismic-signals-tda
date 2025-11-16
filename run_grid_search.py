@@ -181,7 +181,8 @@ def main():
     # Parameter distributions for BinaryClassificationTE (Takens Embedding)
     param_distributions = {
         'distance': [wasserstein, bottleneck],  # distance metric between persistence diagrams
-        'weights': [[1], [2, 1]],  # Weights for distance calculation, the length depends on homology dimensions used
+        'weights': [(1,), (1, 1), (2, 1), (1, 0.5)],  # Weights for distance calculation - use tuples for compatibility
+        'maxdim': [0, 1],  # Maximum homology dimension (0=only H0, 1=H0+H1)
         'sample': [20],  # Number of diagrams to sample
         'thresh': [1000, 5000, 10000],  # Threshold
         'alpha': [0.25, 0.5, 0.75, 1.0],  # FPS subsampling proportion

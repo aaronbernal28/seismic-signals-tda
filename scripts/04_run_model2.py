@@ -62,7 +62,13 @@ def main():
     
     # Metrics
     accuracy = accuracy_score(y_test, y_pred)
-    auc = roc_auc_score(y_test, y_proba)
+    # roc_auc_score expects a 1D array for binary classification (probability of positive class)
+    if hasattr(y_proba, 'ndim') and y_proba.ndim > 1:
+        # Model returns probabilities for both classes in column 0 and 1; take prob of positive class
+        y_proba_pos = y_proba[:, 1]
+    else:
+        y_proba_pos = y_proba
+    auc = roc_auc_score(y_test, y_proba_pos)
     
     print(f"✓ Evaluation completed in {eval_time/60:.2f} minutes")
     

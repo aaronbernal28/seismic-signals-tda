@@ -6,7 +6,6 @@ Uses sklearn.model_selection.RandomizedSearchCV
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent))  # Add repository root to path
 import numpy as np
 import pandas as pd
 from src.models.model2 import BinaryClassificationTE
@@ -173,7 +172,7 @@ def main():
     np.random.seed(28)
     
     # Load datasets
-    X_train, y_train, _, _ = ut.load_datasets(max_samples=30)
+    X_train, y_train, _, _ = ut.load_datasets(max_samples=100)
     
     # =========================================================================
     # HYPERPARAMETER DISTRIBUTIONS - TO BE COMPLETED
@@ -181,30 +180,29 @@ def main():
     
     # Parameter distributions for BinaryClassificationTE (Takens Embedding)
     param_distributions = {
-        'distance': [wasserstein, bottleneck],  # distance metric between persistence diagrams
+        'distance': [wasserstein],  # distance metric between persistence diagrams
         'weights': [(1,), (1, 1), (2, 1), (1, 2)],  # Weights for distance calculation - use tuples for compatibility
-        'maxdim': [0, 1],  # Maximum homology dimension (0=only H0, 1=H0+H1)
-        'sample': [20],  # Number of diagrams to sample
-        'thresh': [1000, 2000],  # Threshold
-        'alpha': [0.25, 0.5, 0.75],  # FPS subsampling proportion
-        'max_points': [100, 200],  # Maximum number of Takens points
+        'sample': list(range(10, 20)),  # Number of diagrams to sample
+        'thresh': np.linspace(1000, 3000, 10),  # Threshold
+        'alpha': np.linspace(0.25, 0.9, 10),  # FPS subsampling proportion
+        'max_points': list(range(100, 300, 50)),  # Maximum number of Takens points
         'seed': [28]  # Random seed for reproducibility
     }
 
     # Parameter distributions for BinaryClassificationTE (Takens Embedding)
     param_distributions_te = {
         **param_distributions,
-        'dim': [3, 4, 5, 10, 20],  # Takens embedding dimension
-        'tau': [3, 4, 5, 10],  # Time delay
-        'stride': [1, 2],  # Stride
+        'dim': [int(2**i) for i in range(1, 5)],  # Takens embedding dimension
+        'tau': [int(2**i) for i in range(1, 5)],  # Time delay
+        'stride': list(range(1, 5)),  # Stride
     }
     
     # Parameter distributions for BinaryClassificationMFCC (MFCC Features)
     param_distributions_mfcc = {
         **param_distributions,
-        'n_mfcc': [10, 20],  # Number of MFCC coefficients
-        'win_length_sec': [0.6, 0.3, 0.4],  # Window length win_length = int(sr * win_length_sec)
-        'hop_length_sec': [0.1, 0.15, 0.2],  # Hop length hop_length = int(sr * hop_length_sec)
+        'n_mfcc': list(range(10, 30, 5)),  # Number of MFCC coefficients
+        'win_length_sec': np.linspace(0.2, 1.0, 10),  # Window length win_length = int(sr * win_length_sec)
+        'hop_length_sec': np.linspace(0.1, 0.5, 10),  # Hop length hop_length = int(sr * hop_length_sec)
     }
     
     # =========================================================================
@@ -213,7 +211,7 @@ def main():
     n_iter = 3  # Number of random parameter combinations to try per model
     cv_folds = 3  # Number of cross-validation folds
     random_state = 28  # Random seed for reproducibility
-    n_jobs = -1  # Number of parallel jobs for RandomizedSearchCV
+    n_jobs = 10  # Number of parallel jobs for RandomizedSearchCV
     
     # =========================================================================
     # RUN RANDOMIZED SEARCH FOR MODEL 2 (Takens Embedding)

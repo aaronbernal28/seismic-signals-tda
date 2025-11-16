@@ -214,5 +214,3 @@ scripts/ecg.py
 docs/*
 scripts/fps/*
 data/raw/events.xml
-data/results/grid_search_mfcc.csv
-data/results/grid_search_te.csv

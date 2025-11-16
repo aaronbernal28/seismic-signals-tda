@@ -135,7 +135,7 @@ class BinaryClassificationMFCC(PersistenceDiagramDatabaseMFCC, BaseEstimator, Cl
         elif mean_dist_E < np.inf and mean_dist_N == np.inf:
             prob = 1.0
         else:
-            prob = 1 / (1 + np.exp(mean_dist_N - mean_dist_E))
+            prob = 1 / (1 + np.exp(mean_dist_E - mean_dist_N))
         return prob
     
     def predict_proba(self, X):

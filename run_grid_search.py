@@ -172,7 +172,7 @@ def main():
     np.random.seed(28)
     
     # Load datasets
-    X_train, y_train, X_test, y_test = ut.load_datasets()
+    X_train, y_train, _, _ = ut.load_datasets(max_samples=None)
     
     # =========================================================================
     # HYPERPARAMETER DISTRIBUTIONS - TO BE COMPLETED
@@ -182,7 +182,7 @@ def main():
     param_distributions = {
         'distance': [wasserstein, bottleneck],  # distance metric between persistence diagrams
         'weights': [[1], [2, 1]],  # Weights for distance calculation, the length depends on homology dimensions used
-        'sample': [10],  # Number of diagrams to sample
+        'sample': [20],  # Number of diagrams to sample
         'thresh': [1000, 5000, 10000],  # Threshold
         'alpha': [0.25, 0.5, 0.75, 1.0],  # FPS subsampling proportion
         'max_points': [100, 200, 300],  # Maximum number of Takens points

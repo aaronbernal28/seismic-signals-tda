@@ -88,8 +88,10 @@ class SeismicDataset:
                    [self.mags[i] for i in range(*idx.indices(len(self)))]
         return self.signals[idx], self.labels[idx], self.mags[idx]
     
-    def get_data(self):
+    def get_data(self, max_samples=None):
         """Get all signals, labels, and mags as numpy arrays."""
+        if max_samples is not None:
+            return self.signals[:max_samples], np.array(self.labels[:max_samples]), np.array(self.mags[:max_samples])
         return self.signals, np.array(self.labels), np.array(self.mags)
 
 def download_waveforms():
@@ -168,7 +170,7 @@ def compute_distances(dgm1, dgm2):
     """
     return ecg.compute_distances(dgm1, dgm2)
 
-def load_datasets(train_path=None, test_path=None, seed=None):
+def load_datasets(train_path=None, test_path=None, seed=None, max_samples=None):
     """Load training and test datasets.
     
     Args:
@@ -190,8 +192,8 @@ def load_datasets(train_path=None, test_path=None, seed=None):
     train_dataset = SeismicDataset(data_path=Path(train_path), seed=seed)
     test_dataset = SeismicDataset(data_path=Path(test_path), seed=seed)
     
-    X_train, y_train, mag_train = train_dataset.get_data()
-    X_test, y_test, mag_test = test_dataset.get_data()
+    X_train, y_train, mag_train = train_dataset.get_data(max_samples=max_samples)
+    X_test, y_test, mag_test = test_dataset.get_data(max_samples=max_samples)
     
     print(f"✓ Datasets loaded successfully")
     print(f"  Train: {len(train_dataset)} signals")

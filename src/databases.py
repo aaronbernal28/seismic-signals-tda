@@ -133,6 +133,12 @@ class PersistenceDiagramDatabaseMFCC:
         self.sr = sr
         self.win_length = int(win_length_sec * sr)
         self.hop_length = max(1, int(hop_length_sec * sr))
+        
+        # Validate: librosa requires win_length >= n_mfcc
+        if self.win_length < self.n_mfcc:
+            # Adjust win_length to be at least n_mfcc
+            self.win_length = self.n_mfcc
+        
         # RNG for sampling
         self.rng = np.random.default_rng(self.seed)
 

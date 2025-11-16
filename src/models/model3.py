@@ -63,8 +63,16 @@ class BinaryClassificationMFCC(PersistenceDiagramDatabaseMFCC, BaseEstimator, Cl
             )
             w = np.asarray(self.weights, dtype=float)
             s = np.sum(w)
-            self._normalized_weights = (w / s) if s != 0 else np.asarray(self.weights, dtype=float)
+            if s == 0:
+                # If all weights are 0, use equal weights
+                self._normalized_weights = np.ones_like(w) / len(w)
+            else:
+                self._normalized_weights = w / s
             self._initialized = True
+    
+    def __sklearn_is_fitted__(self):
+        """Check if the model is fitted (for scikit-learn compatibility)."""
+        return hasattr(self, 'classes_') and self._initialized
     
     def fit(self, X, y, verbose=False):
         """ Fit the binary classification model. 
@@ -72,7 +80,15 @@ class BinaryClassificationMFCC(PersistenceDiagramDatabaseMFCC, BaseEstimator, Cl
             X: List[ndarray] - each element is a 1D signal
             y: List[int] of labels (0 or 1)
         """
+        # Reset state to prevent data leakage between CV folds
+        self._initialized = False
+        self._normalized_weights = None
+        
         self._ensure_initialized()
+        
+        # Clear database from previous fit (critical for CV)
+        self.db = {label: {d: [] for d in range(self.maxdim + 1)} for label in self.labels}
+        
         # Store classes for scikit-learn compatibility
         self.classes_ = np.unique(y)
         
@@ -156,10 +172,11 @@ class BinaryClassificationMFCC(PersistenceDiagramDatabaseMFCC, BaseEstimator, Cl
         Args:
             X: List[ndarray] - each element is a 1D signal
         Returns:
-            labels: List[int] of predicted labels (0 or 1)
+            labels: ndarray of predicted labels (0 or 1)
         """
         probs = self.predict_proba(X)
-        labels = [1 if p >= 0.5 else 0 for p in probs]
+        # Use probability of class 1 (second column)
+        labels = (probs[:, 1] >= 0.5).astype(int)
         return labels
 
     def score(self, X, y):

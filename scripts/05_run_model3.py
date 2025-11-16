@@ -26,7 +26,7 @@ def main():
     np.random.seed(28)
     
     # Load datasets
-    X_train, y_train, X_test, y_test = ut.load_datasets()
+    X_train, y_train, X_test, y_test = ut.load_datasets(max_samples=100)
     
     # Initialize model
     print(f"\n{'=' * 70}")
@@ -35,12 +35,12 @@ def main():
     
     model = BinaryClassificationMFCC(
         distance=wasserstein,
-        weigths=[1, 1],
+        weights=(1, 1),
         n_mfcc=20,
         sr=40.0,
         win_length_sec=0.6,
         hop_length_sec=0.2,
-        sample=50,
+        sample=20,
         thresh=np.inf,
         alpha=0.5,
         max_points=100

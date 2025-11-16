@@ -25,7 +25,7 @@ def main():
     np.random.seed(28)
     
     # Load datasets
-    X_train, y_train, X_test, y_test = ut.load_datasets()
+    X_train, y_train, X_test, y_test = ut.load_datasets(max_samples=100)
     
     # Initialize model with best configuration
     print(f"\n{'=' * 70}")
@@ -34,11 +34,11 @@ def main():
     
     model = BinaryClassificationTE(
         distance=wasserstein,
-        weigths=[1],
+        weights=(1,),
         dim=4,
-        tau=10,
-        stride=10,
-        sample=50,
+        tau=5,
+        stride=1,
+        sample=20,
         thresh=np.inf,
         alpha=0.5,
         max_points=100

@@ -56,7 +56,7 @@ def randomized_search_te(X, y, param_distributions, n_iter=10, cv=3, random_stat
         verbose=2,
         n_jobs=n_jobs,
         return_train_score=True,
-        error_score='raise'
+        error_score=np.nan
     )
     
     # Fit the random search
@@ -105,7 +105,7 @@ def randomized_search_mfcc(X, y, param_distributions, n_iter=10, cv=3, random_st
         verbose=2,
         n_jobs=n_jobs,
         return_train_score=True,
-        error_score='raise'
+        error_score=np.nan
     )
     
     # Fit the random search

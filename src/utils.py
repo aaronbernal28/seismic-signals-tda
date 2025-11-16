@@ -62,13 +62,16 @@ class SeismicDataset:
                 if np.isnan(mag):
                     mag = 0.0
 
-                # Get first trace data
-                trace_name = list(sig_group.keys())[0]
-                data = sig_group[trace_name]['data'][:]
-                
-                self.signals.append(data)
-                self.labels.append(label)
-                self.mags.append(mag)
+                # Iterate over ALL traces (e.g., 'trace_0', 'trace_1')
+                # for this interval and add each as a signal.
+                for trace_name in sig_group.keys():
+                    # Check if the key is a group and contains 'data'
+                    if isinstance(sig_group[trace_name], h5py.Group) and 'data' in sig_group[trace_name]:
+                        data = sig_group[trace_name]['data'][:]
+                        
+                        self.signals.append(data)
+                        self.labels.append(label)
+                        self.mags.append(mag)
         
         # Shuffle the data using per-instance RNG (optional reproducibility via seed)
         indices = np.arange(len(self.signals))

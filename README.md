@@ -11,27 +11,28 @@ This project applies Topological Data Analysis (TDA) techniques to seismic signa
 
 ## Project Structure
 
-```
+```text
 seismic-signals-tda/
 ├── config/              # Configuration files and parameters
 ├── data/
-│   ├── raw/            # Raw seismic event data (XML format)
-│   ├── processed/      # Preprocessed signals in HDF5 format
-│   └── results/        # Model results and outputs
-├── docs/               # Documentation
-├── notebooks/          # Jupyter notebooks for experiments and analysis
-├── scripts/            # Data acquisition and preprocessing scripts
-│   └── fps/           # Farthest Point Sampling examples
+│   ├── raw/             # Raw seismic event data (XML format)
+│   ├── processed/       # Preprocessed signals in HDF5 format
+│   └── results/         # Model results, CSVs, and plots
+├── docs/                # Documentation
+├── notebooks/           # Jupyter notebooks for experiments and visualization
+├── scripts/             # Processing and Training Pipeline
+│   ├── 01_get_raw_events.py    # Download catalog from IRIS
+│   ├── 02_get_intervals.py     # Generate event/non-event intervals
+│   ├── 03_get_signals.py       # Download waveforms
+│   ├── 04_run_model2.py        # Train Takens Embedding model
+│   ├── 05_run_model3.py        # Train MFCC model
+│   └── 06_best_model.py        # Evaluate the optimal model configuration
 ├── src/
-│   ├── databases.py    # Persistence diagram database implementation
-│   ├── preprocess.py   # Signal preprocessing utilities
-│   ├── utils.py        # General utility functions
-│   ├── ecg.py         # ECG signal utilities
-│   └── models/         # Classification models using TDA features
-│       ├── model1.py
-│       ├── model2.py
-│       └── model3.py
-└── run_grid_search.py  # Grid search for hyperparameter tuning
+│   ├── databases.py     # Persistence diagram database implementation
+│   ├── preprocess.py    # Signal preprocessing utilities
+│   ├── models/          # Classification models (TE and MFCC variants)
+│   └── utils.py         # General utility functions
+└── run_grid_search.py   # Hyperparameter tuning script
 ```
 
 ## Methodology
@@ -67,8 +68,11 @@ pip install -r requirements.txt
    python scripts/03_get_signals.py
    ```
 
-2. Explore notebooks for analysis and model training:
-   - `07_model2.ipynb`: Binary classification using persistence diagram databases
+2. Train & Evaluate Best Model: To reproduce the best results (~0.92 AUCROC) using the identified parameters:
+   ```bash
+   python scripts/06_best_model.py
+   ```
+Results will be saved to data/results/best_model_analysis/
 
 ## Colab
 Run the following code in a Google Colab notebook to set up the environment and execute the grid search for model training:
@@ -82,8 +86,8 @@ Run the following code in a Google Colab notebook to set up the environment and 
 # Change to the repository directory
 %cd seismic-signals-tda
 
-# Run the grid search script
-!python run_grid_search.py
+# Run the evaluation script
+!python scripts/06_best_model.py
 ```
 
 ## References

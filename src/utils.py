@@ -196,7 +196,7 @@ def load_datasets(train_path=None, test_path=None, seed=None, max_samples=None):
     test_dataset = SeismicDataset(data_path=Path(test_path), seed=seed)
     
     X_train, y_train, mag_train = train_dataset.get_data(max_samples=max_samples)
-    X_test, y_test, mag_test = test_dataset.get_data(max_samples=int((max_samples)*0.2))
+    X_test, y_test, mag_test = test_dataset.get_data(max_samples=int((max_samples)*0.2) if max_samples is not None else None)
     
     print(f"✓ Datasets loaded successfully")
     print(f"  Train: {len(train_dataset)} signals")

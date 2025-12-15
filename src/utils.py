@@ -173,6 +173,55 @@ def compute_distances(dgm1, dgm2):
     """
     return ecg.compute_distances(dgm1, dgm2)
 
+def validate_signal_length(signal, dim, tau):
+    """Validar que una señal tenga suficientes timestamps para Takens embedding.
+    
+    Args:
+        signal (np.ndarray): Señal de entrada.
+        dim (int): Dimensión de incrustación.
+        tau (int): Retardo temporal.
+    
+    Returns:
+        bool: True si la señal es válida, False si es muy corta.
+    """
+    # Mínimo necesario: dim + (dim-1)*tau timestamps
+    min_length = dim + (dim - 1) * tau
+    return len(signal) >= min_length
+
+def filter_valid_signals(X, y, dim, tau, verbose=True):
+    """Filtrar señales que son muy cortas para Takens embedding.
+    
+    Args:
+        X (list): Lista de señales.
+        y (np.ndarray): Etiquetas.
+        dim (int): Dimensión de incrustación.
+        tau (int): Retardo temporal.
+        verbose (bool): Imprimir información de filtrado.
+    
+    Returns:
+        tuple: (X_filtered, y_filtered, num_removed)
+    """
+    min_length = dim + (dim - 1) * tau
+    valid_indices = [i for i, signal in enumerate(X) if validate_signal_length(signal, dim, tau)]
+    
+    num_removed = len(X) - len(valid_indices)
+    
+    if num_removed > 0 and verbose:
+        removed_by_label = {}
+        for i, (signal, label) in enumerate(zip(X, y)):
+            if i not in valid_indices:
+                removed_by_label[label] = removed_by_label.get(label, 0) + 1
+        
+        print(f"\n⚠ ADVERTENCIA: {num_removed} señal(es) removida(s) (longitud < {min_length})")
+        for label, count in removed_by_label.items():
+            label_name = 'Terremoto' if label == 1 else 'Ruido'
+            print(f"  - {label_name} (etiqueta {label}): {count} señal(es)")
+    
+    X_filtered = [X[i] for i in valid_indices]
+    y_filtered = y[valid_indices]
+    
+    return X_filtered, y_filtered, num_removed
+
 def load_datasets(train_path=None, test_path=None, seed=None, max_samples=None):
     """Cargar datasets de entrenamiento y prueba.
     

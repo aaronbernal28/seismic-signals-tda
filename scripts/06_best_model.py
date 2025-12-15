@@ -127,6 +127,29 @@ def main():
     # 1. Cargar Datos
     X_train, y_train, X_test, y_test = ut.load_datasets(max_samples=None) # Usando conjunto de datos completo para evaluación final
     
+    # 1.5. Validar y filtrar señales muy cortas
+    print(f"\n{'─' * 70}")
+    print("Validando longitud de señales...")
+    X_train, y_train, train_removed = ut.filter_valid_signals(
+        X_train, y_train, 
+        dim=BEST_PARAMS['dim'], 
+        tau=BEST_PARAMS['tau'],
+        verbose=True
+    )
+    X_test, y_test, test_removed = ut.filter_valid_signals(
+        X_test, y_test,
+        dim=BEST_PARAMS['dim'],
+        tau=BEST_PARAMS['tau'],
+        verbose=True
+    )
+    
+    if train_removed > 0 or test_removed > 0:
+        print(f"\nSeñales válidas después del filtrado:")
+        print(f"  Entrenamiento: {len(X_train)} señales")
+        print(f"  Prueba: {len(X_test)} señales")
+        print(f"  Etiquetas entrenamiento: {np.bincount(y_train)}")
+        print(f"  Etiquetas prueba: {np.bincount(y_test)}")
+    
     # 2. Inicializar Modelo
     print(f"\nInicializando BinaryClassificationTE con parámetros óptimos...")
     model = BinaryClassificationTE(**BEST_PARAMS, seed=MODEL_SEED)

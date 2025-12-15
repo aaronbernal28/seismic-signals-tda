@@ -103,10 +103,23 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE, BaseEstimator, Classi
         # Almacenar clases para compatibilidad con scikit-learn
         self.classes_ = np.unique(y)
         
+        # Contador de señales omitidas
+        skipped_count = 0
+        skipped_by_label = {}
+        
         for i, (xs, yi) in enumerate(zip(X, y)):
-            self.add_signal(xs, label=yi)
+            success = self.add_signal(xs, label=yi)
+            if not success:
+                skipped_count += 1
+                skipped_by_label[yi] = skipped_by_label.get(yi, 0) + 1
             if verbose and (i % 10 == 0):
                 print(f"Se agregó señal {i}/{len(y)}", end='\r')
+        
+        if skipped_count > 0:
+            print(f"\n⚠ Señales omitidas durante entrenamiento: {skipped_count}")
+            for label, count in skipped_by_label.items():
+                label_name = 'Terremoto' if label == 1 else 'Ruido'
+                print(f"  - {label_name} (etiqueta {label}): {count} señal(es)")
         
         if verbose:
             for label in [0, 1]:

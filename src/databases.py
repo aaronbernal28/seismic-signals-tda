@@ -40,6 +40,9 @@ class PersistenceDiagramDatabaseTE:
         Args:
             signal (np.ndarray): Arreglo 1D de la serie temporal.
             label (int): Identificador único del diagrama.
+        
+        Returns:
+            bool: True si se agregó exitosamente, False si falló.
         """
         diagrams = self.transform(signal)
         
@@ -47,21 +50,24 @@ class PersistenceDiagramDatabaseTE:
             # Agregar cada diagrama de persistencia a la base de datos.
             for dim in range(len(diagrams)):
                 self.db[label][dim].append(diagrams[dim])
+            return True
         except TypeError:
             print(f"Error al agregar la señal con etiqueta {label}: diagrams es None")
+            return False
     
-    def get_diagrams(self, label, dim=0):
+    def get_diagrams(self, label, dim=0, predict_mode=False):
         """Recuperar todos los diagramas de persistencia para una etiqueta y dimensión dadas.
         
         Args:
             label (int): Identificador único del diagrama.
             dim (int): Dimensión de homología.
-            sample (int, opcional): Si se indica, muestrea aleatoriamente esa cantidad de diagramas.
+            predict_mode (bool): Si True, usar todos los diagramas. Si False, aplicar muestreo.
         Returns:
             list: Lista de diagramas de persistencia, cada uno como np.ndarray de forma (~N, 2)
         """
         output = self.db[label][dim]  # Mantener como lista ya que los diagramas tienen formas variables
-        if self.sample is not None and len(output) > 0:
+        # Durante predicción, usar TODOS los diagramas para reducir regularidad y mejorar estimaciones
+        if not predict_mode and self.sample is not None and len(output) > 0:
             indices = self.rng.choice(len(output), size=min(self.sample, len(output)), replace=False)
             output = [output[i] for i in indices]
         return output
@@ -166,6 +172,9 @@ class PersistenceDiagramDatabaseMFCC:
         Args:
             signal (np.ndarray): Arreglo 1D de la serie temporal.
             label (int): Identificador único del diagrama.
+        
+        Returns:
+            bool: True si se agregó exitosamente, False si falló.
         """
         diagrams = self.transform(signal)
         
@@ -173,8 +182,10 @@ class PersistenceDiagramDatabaseMFCC:
             # Agregar cada diagrama de persistencia a la base de datos.
             for dim in range(len(diagrams)):
                 self.db[label][dim].append(diagrams[dim])
+            return True
         except TypeError:
             print(f"Error al agregar la señal con etiqueta {label}: diagrams es None")
+            return False
     
     def get_diagrams(self, label, dim=0):
         """Recuperar todos los diagramas de persistencia para una etiqueta y dimensión dadas.

@@ -7,16 +7,16 @@ from src.cache import get_cache
 
 class PersistenceDiagramDatabaseTE:
     def __init__(self, labels=[0, 1], dim=100, tau=10, stride=1, maxdim=2, sample=None, thresh=np.inf, alpha=0.1, max_points=500, seed=28):
-        """Initialize the persistence diagram database.
+        """Inicializar la base de datos de diagramas de persistencia.
         Args:
-            labels (list): List of unique identifiers for diagrams.
-            dim (int): Embedding dimension for Takens' embedding.
-            tau (int): Time delay for Takens' embedding.
-            stride (int): Stride for Takens' embedding.
-            maxdim (int): Maximum homology dimension to compute.
-            sample (int, optional): If provided, randomly sample this many diagrams when retrieving.
-            thresh (float): Threshold for Vietoris-Rips complex.
-            alpha (float): Proportion of subsampling.
+            labels (list): Lista de identificadores únicos para los diagramas.
+            dim (int): Dimensión de la incrustación de Takens.
+            tau (int): Retardo temporal para la incrustación de Takens.
+            stride (int): Paso para la incrustación de Takens.
+            maxdim (int): Dimensión máxima de homología a calcular.
+            sample (int, opcional): Si se indica, muestrea aleatoriamente esa cantidad de diagramas.
+            thresh (float): Umbral para el complejo de Vietoris-Rips.
+            alpha (float): Proporción de subsampling.
         """
         self.labels = labels
         self.maxdim = maxdim
@@ -26,54 +26,54 @@ class PersistenceDiagramDatabaseTE:
         self.thresh = thresh
         self.alpha = alpha
         self.max_points = max_points
-        # Store TE parameters explicitly for downstream access (e.g., grid search)
+        # Guardar parámetros TE explícitamente para usos posteriores (por ejemplo, grid search)
         self.dim = dim
         self.tau = tau
         self.stride = stride
         self.TE = TakensEmbedding(time_delay=tau, dimension=dim, stride=stride)
-        # RNG for sampling
+        # Generador RNG para muestreo
         self.rng = np.random.default_rng(self.seed)
 
     def add_signal(self, signal, label):
-        """Compute and add the persistence diagram of a signal to the database.
+        """Calcular y agregar el diagrama de persistencia de una señal en la base de datos.
         
         Args:
-            signal (np.ndarray): 1D array of the time series signal.
-            label (int): Unique identifier for the diagram.
+            signal (np.ndarray): Arreglo 1D de la serie temporal.
+            label (int): Identificador único del diagrama.
         """
         diagrams = self.transform(signal)
         
         try:
-            # Add each persistence diagram to the database.
+            # Agregar cada diagrama de persistencia a la base de datos.
             for dim in range(len(diagrams)):
                 self.db[label][dim].append(diagrams[dim])
         except TypeError:
-            print(f"Error adding signal with label {label}: diagrams is None")
+            print(f"Error al agregar la señal con etiqueta {label}: diagrams es None")
     
     def get_diagrams(self, label, dim=0):
-        """Retrieve all persistence diagrams for a given label and dimension.
+        """Recuperar todos los diagramas de persistencia para una etiqueta y dimensión dadas.
         
         Args:
-            label (int): Unique identifier for the diagram.
-            dim (int): Homology dimension.
-            sample (int, optional): If provided, randomly sample this many diagrams.
+            label (int): Identificador único del diagrama.
+            dim (int): Dimensión de homología.
+            sample (int, opcional): Si se indica, muestrea aleatoriamente esa cantidad de diagramas.
         Returns:
-            list: List of persistence diagrams, each as np.ndarray of shape (~N, 2)
+            list: Lista de diagramas de persistencia, cada uno como np.ndarray de forma (~N, 2)
         """
-        output = self.db[label][dim]  # Keep as list since diagrams have varying shapes
+        output = self.db[label][dim]  # Mantener como lista ya que los diagramas tienen formas variables
         if self.sample is not None and len(output) > 0:
             indices = self.rng.choice(len(output), size=min(self.sample, len(output)), replace=False)
             output = [output[i] for i in indices]
         return output
     
     def transform(self, signal):
-        """Compute the persistence diagrams for a given signal. 
+        """Calcular los diagramas de persistencia para una señal dada.
         Args:
-            signal (np.ndarray): 1D array of the time series signal.
+            signal (np.ndarray): Arreglo 1D de la serie temporal.
         Returns:
-            list: List of persistence diagrams, each as np.ndarray of shape (~N, 2)
+            list: Lista de diagramas de persistencia, cada uno como np.ndarray de forma (~N, 2)
         """
-        # Check cache first
+        # Verificar el caché primero
         cache = get_cache()
         cached = cache.get_te(
             signal, self.dim, self.tau, self.stride,
@@ -82,36 +82,36 @@ class PersistenceDiagramDatabaseTE:
         if cached is not None:
             return cached
         
-        # Compute Takens' embedding
+        # Calcular la incrustación de Takens
         try:
-            # TakensEmbedding expects 2D input: (n_samples, n_timestamps)
-            # Reshape 1D signal to 2D if necessary
+            # TakensEmbedding requiere entrada 2D: (n_samples, n_timestamps)
+            # Reajustar señal 1D a 2D si hace falta
             if signal.ndim == 1:
                 signal_2d = signal.reshape(1, -1)
             else:
                 signal_2d = signal
             
-            # Use fit_transform instead of transform (no need to call fit separately)
+            # Usar fit_transform en lugar de transform (no es necesario llamar a fit por separado)
             embedded = self.TE.fit_transform(signal_2d)
             
-            # fit_transform returns shape (n_samples, n_windows, n_dims)
-            # For a single signal, squeeze to get (n_windows, n_dims)
+            # fit_transform devuelve forma (n_samples, n_windows, n_dims)
+            # Para una señal única, se aplana para obtener (n_windows, n_dims)
             if embedded.shape[0] == 1:
                 embedded = embedded[0]
         except ValueError as e:
-            print(f"Error with Takens embeddings: {e}")
+            print(f"Error con las incrustaciones de Takens: {e}")
             return None
         #print("Embedded shape:", embedded.shape, end="\n")
 
-        # Subsample the embedded points using farthest point sampling
-        # fps returns the actual subsampled points, not indices
-        nb_points = max(1, min(int(self.alpha * embedded.shape[0]), self.max_points))  # Ensure at least 1 point
+        # Submuestrear puntos incrustados con FPS (farthest point sampling)
+        # fps devuelve los puntos subsampleados reales, no índices
+        nb_points = max(1, min(int(self.alpha * embedded.shape[0]), self.max_points))  # Asegurar al menos 1 punto
         embedded_sparse = np.array(fps(embedded, nb_points=nb_points, starting_point=None))
         
-        # Compute persistence diagrams
+        # Calcular diagramas de persistencia
         diagrams = compute_persistence(embedded_sparse, maxdim=self.maxdim, thresh=self.thresh)
         
-        # Store in cache
+        # Guardar en el caché
         cache.put_te(
             signal, self.dim, self.tau, self.stride,
             self.maxdim, self.thresh, self.alpha, self.max_points,
@@ -124,18 +124,18 @@ class PersistenceDiagramDatabaseTE:
 class PersistenceDiagramDatabaseMFCC:
     def __init__(self, labels=[0, 1], n_mfcc=40, sr=40.0, win_length_sec=0.3, hop_length_sec=0.2, 
                  maxdim=2, sample=None, thresh=np.inf, alpha=0.1, max_points=500, seed=28):
-        """Initialize the persistence diagram database for MFCC features.
+        """Inicializar la base de datos de diagramas para características MFCC.
         Args:
-            labels (list): List of unique identifiers for diagrams.
-            n_mfcc (int): Number of MFCC coefficients to compute.
-            sr (float): Sample rate of the signal.
-            win_length_sec (float): Window length in seconds for MFCC.
-            hop_length_sec (float): Hop length in seconds for MFCC.
-            maxdim (int): Maximum homology dimension to compute.
-            sample (int, optional): If provided, randomly sample this many diagrams when retrieving.
-            thresh (float): Threshold for Vietoris-Rips complex.
-            alpha (float): Proportion of subsampling for FPS.
-            max_points (int): Maximum number of points to keep after subsampling.
+            labels (list): Lista de identificadores únicos para los diagramas.
+            n_mfcc (int): Cantidad de coeficientes MFCC a calcular.
+            sr (float): Frecuencia de muestreo de la señal.
+            win_length_sec (float): Longitud de ventana en segundos para MFCC.
+            hop_length_sec (float): Paso en segundos para MFCC.
+            maxdim (int): Dimensión máxima de homología a calcular.
+            sample (int, opcional): Si se indica, muestrea aleatoriamente esa cantidad de diagramas.
+            thresh (float): Umbral para el complejo de Vietoris-Rips.
+            alpha (float): Proporción de subsampling para FPS.
+            max_points (int): Número máximo de puntos a conservar tras el subsampling.
         """
         self.labels = labels
         self.maxdim = maxdim
@@ -146,60 +146,60 @@ class PersistenceDiagramDatabaseMFCC:
         self.alpha = alpha
         self.max_points = max_points
         
-        # MFCC parameters
+        # Parámetros MFCC
         self.n_mfcc = n_mfcc
         self.sr = sr
         self.win_length = int(win_length_sec * sr)
         self.hop_length = max(1, int(hop_length_sec * sr))
         
-        # Validate: librosa requires win_length >= n_mfcc
+        # Validación: librosa requiere win_length >= n_mfcc
         if self.win_length < self.n_mfcc:
-            # Adjust win_length to be at least n_mfcc
+            # Ajustar win_length para que sea al menos n_mfcc
             self.win_length = self.n_mfcc
         
-        # RNG for sampling
+        # Generador RNG para muestreo
         self.rng = np.random.default_rng(self.seed)
 
     def add_signal(self, signal, label):
-        """Compute and add the persistence diagram of a signal to the database.
+        """Calcular y agregar el diagrama de persistencia de una señal en la base de datos.
         
         Args:
-            signal (np.ndarray): 1D array of the time series signal.
-            label (int): Unique identifier for the diagram.
+            signal (np.ndarray): Arreglo 1D de la serie temporal.
+            label (int): Identificador único del diagrama.
         """
         diagrams = self.transform(signal)
         
         try:
-            # Add each persistence diagram to the database.
+            # Agregar cada diagrama de persistencia a la base de datos.
             for dim in range(len(diagrams)):
                 self.db[label][dim].append(diagrams[dim])
         except TypeError:
-            print(f"Error adding signal with label {label}: diagrams is None")
+            print(f"Error al agregar la señal con etiqueta {label}: diagrams es None")
     
     def get_diagrams(self, label, dim=0):
-        """Retrieve all persistence diagrams for a given label and dimension.
+        """Recuperar todos los diagramas de persistencia para una etiqueta y dimensión dadas.
         
         Args:
-            label (int): Unique identifier for the diagram.
-            dim (int): Homology dimension.
-            sample (int, optional): If provided, randomly sample this many diagrams.
+            label (int): Identificador único del diagrama.
+            dim (int): Dimensión de homología.
+            sample (int, opcional): Si se indica, muestrea aleatoriamente esa cantidad de diagramas.
         Returns:
-            list: List of persistence diagrams, each as np.ndarray of shape (~N, 2)
+            list: Lista de diagramas de persistencia, cada uno como np.ndarray de forma (~N, 2)
         """
-        output = self.db[label][dim]  # Keep as list since diagrams have varying shapes
+        output = self.db[label][dim]  # Mantener como lista ya que los diagramas tienen formas variables
         if self.sample is not None and len(output) > 0:
             indices = self.rng.choice(len(output), size=min(self.sample, len(output)), replace=False)
             output = [output[i] for i in indices]
         return output
     
     def transform(self, signal):
-        """Compute the persistence diagrams for a given signal using MFCC features.
+        """Calcular los diagramas de persistencia para una señal usando características MFCC.
         Args:
-            signal (np.ndarray): 1D array of the time series signal.
+            signal (np.ndarray): Arreglo 1D de la serie temporal.
         Returns:
-            list: List of persistence diagrams, each as np.ndarray of shape (~N, 2)
+            list: Lista de diagramas de persistencia, cada uno como np.ndarray de forma (~N, 2)
         """
-        # Check cache first
+        # Verificar el caché primero
         cache = get_cache()
         cached = cache.get_mfcc(
             signal, self.n_mfcc, self.sr, self.win_length, self.hop_length,
@@ -209,10 +209,10 @@ class PersistenceDiagramDatabaseMFCC:
             return cached
         
         try:
-            # Convert signal to float32
+            # Convertir señal a float32
             x = signal.astype(np.float32).copy()
             
-            # Compute MFCC features
+            # Calcular características MFCC
             mfcc = librosa.feature.mfcc(
                 y=x,
                 sr=self.sr,
@@ -225,7 +225,7 @@ class PersistenceDiagramDatabaseMFCC:
                 center=False
             )
             
-            # Compute delta and delta-delta features with adaptive width
+            # Calcular características delta y delta-delta con ancho adaptativo
             width = min(mfcc.shape[1], 3) if mfcc.shape[1] < 9 else 9
             if width % 2 == 0:
                 width -= 1
@@ -234,31 +234,31 @@ class PersistenceDiagramDatabaseMFCC:
             mfcc_delta = librosa.feature.delta(mfcc, mode='mirror', order=1)
             mfcc_delta_delta = librosa.feature.delta(mfcc, mode='mirror', order=2)
             
-            # Concatenate MFCC, delta, and delta-delta
+            # Concatenar MFCC, delta y delta-delta
             mfcc_combined = np.concatenate((mfcc, mfcc_delta, mfcc_delta_delta), axis=0)
             
-            # Normalize
+            # Normalizar
             mfcc_combined_norm = (mfcc_combined - np.mean(mfcc_combined, axis=1, keepdims=True)) / \
                                  (np.std(mfcc_combined, axis=1, keepdims=True) + 1e-8)
             
-            # Transpose to get (frames, emb_dim) shape
+            # Transponer para obtener forma (frames, emb_dim)
             point_cloud = mfcc_combined_norm.T
             
         except Exception as e:
-            print(f"Error computing MFCC features: {e}")
+            print(f"Error al calcular características MFCC: {e}")
             return None
         
-        # Apply FPS subsampling
+        # Aplicar subsampling FPS
         nb_points = max(1, min(int(self.alpha * point_cloud.shape[0]), self.max_points))
         if nb_points < point_cloud.shape[0]:
             point_cloud_sparse = np.array(fps(point_cloud, nb_points=nb_points, starting_point=None))
         else:
             point_cloud_sparse = point_cloud
         
-        # Compute persistence diagrams
+        # Calcular diagramas de persistencia
         diagrams = compute_persistence(point_cloud_sparse, maxdim=self.maxdim, thresh=self.thresh)
         
-        # Store in cache
+        # Guardar en el caché
         cache.put_mfcc(
             signal, self.n_mfcc, self.sr, self.win_length, self.hop_length,
             self.maxdim, self.thresh, self.alpha, self.max_points,

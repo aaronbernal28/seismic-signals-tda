@@ -1,12 +1,12 @@
 """
-Script to download raw seismic data and event catalogs.
-Based on notebook 01_experiments.ipynb
+Script para descargar datos sísmicos crudos y catálogos de eventos.
+Basado en el notebook 01_experiments.ipynb
 """
 
 import sys
 from pathlib import Path
 
-# Add parent directory to path to allow imports from config
+# Agregar directorio padre al path para permitir importaciones desde config
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from obspy.clients.fdsn import Client
@@ -16,11 +16,11 @@ from src.preprocess import download_events as download_events_func, filter_event
 
 
 def download_events():
-    """Download earthquake event catalog."""
-    print("\nSearching for earthquake events...")
+    """Descargar catálogo de eventos sísmicos."""
+    print("\nBuscando eventos sísmicos...")
     client = Client(DATA_CENTER)
     
-    window = 5  # degrees
+    window = 5  # grados
     
     try:
         catalog = download_events_func(
@@ -32,43 +32,43 @@ def download_events():
             window_degrees=window
         )
         
-        print(f"  Found {len(catalog)} events")
+        print(f"  Encontrados {len(catalog)} eventos")
         
-        # Filter by distance
+        # Filtrar por distancia
         filtered_catalog = filter_events_by_distance(catalog, LATITUDE, LONGITUDE, MAX_DISTANCE_KM)
         
-        # Save to file
+        # Guardar en archivo
         output_file = Path(RAW_DATA_PATH) / "events.xml"
         filtered_catalog_obj = Catalog(events=filtered_catalog)
         filtered_catalog_obj.write(str(output_file), format='QUAKEML')
         
-        print(f"✓ Event catalog saved to {output_file}")
-        print(f"  {len(filtered_catalog)} events after distance filtering")
+        print(f"✓ Catálogo de eventos guardado en {output_file}")
+        print(f"  {len(filtered_catalog)} eventos después del filtrado por distancia")
         return filtered_catalog_obj
         
     except Exception as e:
-        print(f"✗ Error downloading events: {e}")
+        print(f"✗ Error descargando eventos: {e}")
         return None
 
 
 def main():
-    """Main execution function."""
+    """Función principal de ejecución."""
     print("=" * 60)
-    print("Seismic Data Acquisition Script")
+    print("Script de Adquisición de Datos Sísmicos")
     print("=" * 60)
-    print(f"Station: {NETWORK}.{STATION_CODE}")
-    print(f"Time range: {START_TIME} to {END_TIME}")
-    print(f"Channel: {CHANNEL}")
+    print(f"Estación: {NETWORK}.{STATION_CODE}")
+    print(f"Rango temporal: {START_TIME} a {END_TIME}")
+    print(f"Canal: {CHANNEL}")
     print("=" * 60)
     
-    # Download data
+    # Descargar datos
     events = download_events()
     
     print("\n" + "=" * 60)
     if events:
-        print("✓ Data acquisition completed successfully!")
+        print("✓ Adquisición de datos completada exitosamente!")
     else:
-        print("⚠ Data acquisition completed with errors")
+        print("⚠ Adquisición de datos completada con errores")
     print("=" * 60)
 
 

@@ -1,15 +1,13 @@
 """
-Randomized Grid Search with Cross-Validation for both BinaryClassificationTE and BinaryClassificationMFCC models.
-Main metric: ROC AUC
-Uses sklearn.model_selection.RandomizedSearchCV
+Búsqueda aleatoria en cuadrícula con validación cruzada para el modelo BinaryClassificationTE.
+Métrica principal: ROC AUC
+Usa sklearn.model_selection.RandomizedSearchCV
 """
 
-import sys
 from pathlib import Path
 import numpy as np
 import pandas as pd
 from src.models.model2 import BinaryClassificationTE
-from src.models.model3 import BinaryClassificationMFCC
 import src.utils as ut
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.metrics import make_scorer, roc_auc_score
@@ -17,34 +15,22 @@ from persim import wasserstein, bottleneck
 from src.cache import get_cache
 
 def randomized_search_te(X, y, param_distributions, n_iter=10, cv=3, random_state=28, n_jobs=1):
-    """Randomized search for BinaryClassificationTE using sklearn's RandomizedSearchCV.
-    
-    Args:
-        X: Training data (list of arrays)
-        y: Training labels (numpy array)
-        param_distributions: Dictionary with parameter distributions to sample from
-        n_iter: Number of random combinations to try
-        cv: Number of cross-validation folds
-        random_state: Random seed
-        
-    Returns:
-        RandomizedSearchCV: Fitted search object with results
-    """
+    """Búsqueda aleatoria para BinaryClassificationTE usando RandomizedSearchCV de sklearn."""
     print("=" * 80)
-    print("RANDOMIZED GRID SEARCH: BinaryClassificationTE")
+    print("BÚSQUEDA ALEATORIA EN CUADRÍCULA: BinaryClassificationTE")
     print("=" * 80)
-    print(f"Parameters to search: {list(param_distributions.keys())}")
-    print(f"Number of iterations: {n_iter}")
-    print(f"Cross-validation folds: {cv}")
+    print(f"Parámetros a explorar: {list(param_distributions.keys())}")
+    print(f"Número de iteraciones: {n_iter}")
+    print(f"Pliegues de validación cruzada: {cv}")
     print("=" * 80)
     
-    # Initialize base model
+    # Inicializar modelo base
     base_model = BinaryClassificationTE()
     
-    # Create scorer for ROC AUC
+    # Crear scorer para ROC AUC
     auc_scorer = make_scorer(roc_auc_score, needs_proba=True)
     
-    # Create RandomizedSearchCV
+    # Crear RandomizedSearchCV
     random_search = RandomizedSearchCV(
         estimator=base_model,
         param_distributions=param_distributions,
@@ -58,82 +44,25 @@ def randomized_search_te(X, y, param_distributions, n_iter=10, cv=3, random_stat
         error_score=np.nan
     )
     
-    # Fit the random search
-    print("\nStarting randomized search...\n")
-    random_search.fit(X, y)
-    
-    return random_search
-
-
-def randomized_search_mfcc(X, y, param_distributions, n_iter=10, cv=3, random_state=28, n_jobs=1):
-    """Randomized search for BinaryClassificationMFCC using sklearn's RandomizedSearchCV.
-    
-    Args:
-        X: Training data (list of arrays)
-        y: Training labels (numpy array)
-        param_distributions: Dictionary with parameter distributions to sample from
-        n_iter: Number of random combinations to try
-        cv: Number of cross-validation folds
-        random_state: Random seed
-        
-    Returns:
-        RandomizedSearchCV: Fitted search object with results
-    """
-    print("=" * 80)
-    print("RANDOMIZED GRID SEARCH: BinaryClassificationMFCC")
-    print("=" * 80)
-    print(f"Parameters to search: {list(param_distributions.keys())}")
-    print(f"Number of iterations: {n_iter}")
-    print(f"Cross-validation folds: {cv}")
-    print("=" * 80)
-    
-    # Initialize base model
-    base_model = BinaryClassificationMFCC()
-    
-    # Create scorer for ROC AUC
-    auc_scorer = make_scorer(roc_auc_score, needs_proba=True)
-    
-    # Create RandomizedSearchCV
-    random_search = RandomizedSearchCV(
-        estimator=base_model,
-        param_distributions=param_distributions,
-        n_iter=n_iter,
-        cv=cv,
-        scoring=auc_scorer,
-        random_state=random_state,
-        verbose=2,
-        n_jobs=n_jobs,
-        return_train_score=True,
-        error_score=np.nan
-    )
-    
-    # Fit the random search
-    print("\nStarting randomized search...\n")
+    # Ajustar la búsqueda aleatoria
+    print("\nIniciando búsqueda aleatoria...\n")
     random_search.fit(X, y)
     
     return random_search
 
 
 def display_results(search, model_name):
-    """Display and format results from RandomizedSearchCV.
-    
-    Args:
-        search: Fitted RandomizedSearchCV object
-        model_name: Name of the model for display
-        
-    Returns:
-        pd.DataFrame: Results sorted by mean test score
-    """
-    # Convert results to DataFrame
+    """Mostrar y formatear resultados de RandomizedSearchCV."""
+    # Convertir resultados a DataFrame
     results_df = pd.DataFrame(search.cv_results_)
     
-    # Select relevant columns
+    # Seleccionar columnas relevantes
     columns_to_keep = [col for col in results_df.columns if col.startswith('param_') or 
                        col in ['mean_test_score', 'std_test_score', 'rank_test_score', 
                                'mean_train_score', 'std_train_score', 'mean_fit_time']]
     results_df = results_df[columns_to_keep]
     
-    # Rename columns for clarity
+    # Renombrar columnas para claridad
     results_df = results_df.rename(columns={
         'mean_test_score': 'mean_auc',
         'std_test_score': 'std_auc',
@@ -143,78 +72,70 @@ def display_results(search, model_name):
         'rank_test_score': 'rank'
     })
     
-    # Remove 'param_' prefix from parameter columns
+    # Quitar el prefijo 'param_' de las columnas de parámetros
     results_df.columns = [col.replace('param_', '') if col.startswith('param_') else col 
                           for col in results_df.columns]
     
-    # Sort by mean AUC
+    # Ordenar por AUC promedio
     results_df = results_df.sort_values('rank').reset_index(drop=True)
     
     print("\n" + "=" * 80)
-    print(f"RESULTS: {model_name}")
+    print(f"RESULTADOS: {model_name}")
     print("=" * 80)
-    print(f"\nBest parameters: {search.best_params_}")
-    print(f"Best AUC score: {search.best_score_:.4f}")
-    print("\nTop 5 configurations:")
+    print(f"\nMejores parámetros: {search.best_params_}")
+    print(f"Mejor AUC: {search.best_score_:.4f}")
+    print("\nTop 5 configuraciones:")
     print(results_df.head(5).to_string())
     
     return results_df
 
 
 def main():
-    """Main execution function."""
+    """Función principal de ejecución."""
     print("=" * 80)
-    print("RANDOMIZED GRID SEARCH WITH CROSS-VALIDATION")
-    print("Main Metric: ROC AUC")
+    print("BÚSQUEDA ALEATORIA EN CUADRÍCULA CON VALIDACIÓN CRUZADA")
+    print("Métrica principal: ROC AUC")
     print("=" * 80)
     
-    # Set random seed
+    # Fijar semilla
     np.random.seed(28)
     
-    # Load datasets
+    # Cargar datasets
     X_train, y_train, _, _ = ut.load_datasets(max_samples=100)
     
     # =========================================================================
-    # HYPERPARAMETER DISTRIBUTIONS - TO BE COMPLETED
+    # DISTRIBUCIONES DE HIPERPARÁMETROS - COMPLETAR SI ES NECESARIO
     # =========================================================================
     
-    # Parameter distributions for BinaryClassificationTE (Takens Embedding)
+    # Distribuciones de parámetros para BinaryClassificationTE (Takens Embedding)
     param_distributions = {
-        'distance': [wasserstein],  # distance metric between persistence diagrams
-        'weights': [(1,), (1, 1), (2, 1), (1, 2)],  # Weights for distance calculation - use tuples for compatibility
-        'sample': list(range(10, 20)),  # Number of diagrams to sample
-        'thresh': np.linspace(1000, 3000, 10),  # Threshold
-        'alpha': np.linspace(0.25, 0.9, 10),  # FPS subsampling proportion
-        'max_points': list(range(100, 300, 50)),  # Maximum number of Takens points
-        'seed': [28]  # Random seed for reproducibility
+        'distance': [wasserstein],  # métrica de distancia entre diagramas de persistencia
+        'weights': [(1,), (1, 1), (2, 1), (1, 2)],  # pesos para el cálculo de distancia (tuplas para compatibilidad)
+        'sample': list(range(10, 20)),  # cantidad de diagramas a muestrear
+        'thresh': np.linspace(1000, 3000, 10),  # umbral
+        'alpha': np.linspace(0.25, 0.9, 10),  # proporción de subsampling FPS
+        'max_points': list(range(100, 300, 50)),  # número máximo de puntos de Takens
+        'seed': [28]  # semilla para reproducibilidad
     }
 
-    # Parameter distributions for BinaryClassificationTE (Takens Embedding)
+    # Distribuciones de parámetros específicas para BinaryClassificationTE (Takens Embedding)
     param_distributions_te = {
         **param_distributions,
-        'dim': [int(2**i) for i in range(1, 5)],  # Takens embedding dimension
-        'tau': [int(2**i) for i in range(1, 5)],  # Time delay
-        'stride': list(range(1, 5)),  # Stride
-    }
-    
-    # Parameter distributions for BinaryClassificationMFCC (MFCC Features)
-    param_distributions_mfcc = {
-        **param_distributions,
-        'n_mfcc': list(range(10, 30, 5)),  # Number of MFCC coefficients
-        'win_length_sec': np.linspace(0.2, 1.0, 10),  # Window length win_length = int(sr * win_length_sec)
-        'hop_length_sec': np.linspace(0.1, 0.5, 10),  # Hop length hop_length = int(sr * hop_length_sec)
+        'dim': [int(2**i) for i in range(1, 5)],  # dimensión de la incrustación de Takens
+        'tau': [int(2**i) for i in range(1, 5)],  # retardo temporal
+        'stride': list(range(1, 5)),  # stride
     }
     
     # =========================================================================
-    # GRID SEARCH PARAMETERS
+    # PARÁMETROS DE LA BÚSQUEDA
     # =========================================================================
-    n_iter = 100  # Number of random parameter combinations to try per model
-    cv_folds = 3  # Number of cross-validation folds
-    random_state = 28  # Random seed for reproducibility
-    n_jobs = 10  # Number of parallel jobs for RandomizedSearchCV
+    n_iter = 100  # número de combinaciones aleatorias por modelo
+    cv_folds = 3  # número de pliegues de validación cruzada
+    random_state = 28  # semilla para reproducibilidad
+    n_jobs = 10  # número de trabajos paralelos para RandomizedSearchCV
     
     # =========================================================================
-    # RUN RANDOMIZED SEARCH FOR MODEL 2 (Takens Embedding)
+    # EJECUTAR BÚSQUEDA ALEATORIA PARA EL MODELO 2 (Takens Embedding)
     # =========================================================================
     print("\n")
     search_te = randomized_search_te(
@@ -226,54 +147,26 @@ def main():
         n_jobs=n_jobs
     )
     
-    # Display and save results
+    # Mostrar y guardar resultados
     results_te = display_results(search_te, "BinaryClassificationTE")
     
     output_path_te = Path("data/results/grid_search_te.csv")
     output_path_te.parent.mkdir(exist_ok=True)
     results_te.to_csv(output_path_te, index=False)
-    print(f"\n✓ Results saved to: {output_path_te}")
+    print(f"\n✓ Resultados guardados en: {output_path_te}")
     
-    # Print cache statistics after TE
+    # Imprimir estadísticas del caché luego de TE
     get_cache().print_stats()
     
     # =========================================================================
-    # RUN RANDOMIZED SEARCH FOR MODEL 3 (MFCC)
-    # =========================================================================
-    print("\n\n")
-    search_mfcc = randomized_search_mfcc(
-        X_train, y_train,
-        param_distributions=param_distributions_mfcc,
-        n_iter=n_iter,
-        cv=cv_folds,
-        random_state=random_state,
-        n_jobs=n_jobs
-    )
-    
-    # Display and save results
-    results_mfcc = display_results(search_mfcc, "BinaryClassificationMFCC")
-    
-    output_path_mfcc = Path("data/results/grid_search_mfcc.csv")
-    output_path_mfcc.parent.mkdir(exist_ok=True)
-    results_mfcc.to_csv(output_path_mfcc, index=False)
-    print(f"\n✓ Results saved to: {output_path_mfcc}")
-    
-    # Print final cache statistics
-    get_cache().print_stats()
-    
-    # =========================================================================
-    # SUMMARY
+    # RESUMEN
     # =========================================================================
     print("\n" + "=" * 80)
-    print("RANDOMIZED SEARCH COMPLETED")
+    print("BÚSQUEDA ALEATORIA COMPLETADA")
     print("=" * 80)
-    print(f"\nBest BinaryClassificationTE:")
+    print(f"\nMejor BinaryClassificationTE:")
     print(f"  AUC: {search_te.best_score_:.4f}")
-    print(f"  Params: {search_te.best_params_}")
-    
-    print(f"\nBest BinaryClassificationMFCC:")
-    print(f"  AUC: {search_mfcc.best_score_:.4f}")
-    print(f"  Params: {search_mfcc.best_params_}")
+    print(f"  Parámetros: {search_te.best_params_}")
     
     print("\n" + "=" * 80)
 

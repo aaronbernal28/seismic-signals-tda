@@ -7,16 +7,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def plot_waveform(signal, label='Earthquake', mag=0):
-    """Plot waveform for a given interval."""
-    time = np.arange(len(signal))  # Assume time steps starting from 0
+    """Graficar forma de onda para un intervalo dado."""
+    time = np.arange(len(signal))  # Asumir pasos de tiempo empezando desde 0
     plt.plot(time, signal, linewidth=0.5, color='darkblue')
     plt.title(f'{label} - Mag: {mag}', fontsize=11, fontweight='bold')
-    plt.xlabel('Step (40Hz/s)', fontsize=10)
-    plt.ylabel('Amplitude', fontsize=10)
+    plt.xlabel('Paso (40Hz/s)', fontsize=10)
+    plt.ylabel('Amplitud', fontsize=10)
     plt.grid(True, alpha=0.3)
     
-    # Add statistics text
-    stats_text = f'Mean: {np.mean(signal):.2e}\nStd: {np.std(signal):.2e}\nMin: {np.min(signal):.2e}\nMax: {np.max(signal):.2e}'
+    # Agregar texto de estadísticas
+    stats_text = f'Media: {np.mean(signal):.2e}\nDesv: {np.std(signal):.2e}\nMín: {np.min(signal):.2e}\nMáx: {np.max(signal):.2e}'
     plt.text(0.02, 0.98, stats_text, transform=plt.gca().transAxes, 
              fontsize=9, verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
     
@@ -24,48 +24,48 @@ def plot_waveform(signal, label='Earthquake', mag=0):
     plt.show()
 
 class SeismicDataset:
-    """Dataset class for seismic signals."""
+    """Clase de dataset para señales sísmicas."""
     def __init__(self, data_path=r"data\processed\signals_train.hdf5", seed=None):
         self.data_path = Path(data_path)
         self.signals = []
         self.labels = []
         self.mags = []
-        # Per-instance RNG; no global reseeding
+        # RNG por instancia; sin reseeding global
         self.rng = np.random.default_rng(seed)
         self._load_data()
 
     def _load_data(self):
-        """Load seismic signals and labels from the data path."""
+        """Cargar señales sísmicas y etiquetas desde la ruta de datos."""
         with h5py.File(self.data_path, 'r') as hf:
-            # Load metadata to get mag values
+            # Cargar metadata para obtener valores de mag
             metadata_ids = hf['metadata']['id'][:]
             metadata_mags = hf['metadata']['mag'][:]
             
-            # Decode bytes to strings if necessary
+            # Decodificar bytes a strings si es necesario
             if metadata_ids.dtype.kind == 'S':
                 metadata_ids = [id.decode('utf-8') if id else '' for id in metadata_ids]
             else:
                 metadata_ids = list(metadata_ids)
             
-            # Create a mapping from interval_id to mag
+            # Crear mapeo de interval_id a mag
             id_to_mag = dict(zip(metadata_ids, metadata_mags))
             
-            # Load signals
+            # Cargar señales
             for interval_id in hf['signals'].keys():
                 sig_group = hf['signals'][interval_id]
                 label = sig_group.attrs.get('label', 0)
                 
-                # Get mag from metadata using interval_id
+                # Obtener mag desde metadata usando interval_id
                 mag = id_to_mag.get(interval_id, float('nan'))
                 
-                # Convert NaN to 0.0 for non-events
+                # Convertir NaN a 0.0 para no-eventos
                 if np.isnan(mag):
                     mag = 0.0
 
-                # Iterate over ALL traces (e.g., 'trace_0', 'trace_1')
-                # for this interval and add each as a signal.
+                # Iterar sobre TODAS las trazas (ej. 'trace_0', 'trace_1')
+                # para este intervalo y agregar cada una como señal.
                 for trace_name in sig_group.keys():
-                    # Check if the key is a group and contains 'data'
+                    # Verificar si la clave es un grupo y contiene 'data'
                     if isinstance(sig_group[trace_name], h5py.Group) and 'data' in sig_group[trace_name]:
                         data = sig_group[trace_name]['data'][:]
                         
@@ -73,7 +73,7 @@ class SeismicDataset:
                         self.labels.append(label)
                         self.mags.append(mag)
         
-        # Shuffle the data using per-instance RNG (optional reproducibility via seed)
+        # Mezclar los datos usando RNG por instancia (reproducibilidad opcional via seed)
         indices = np.arange(len(self.signals))
         self.rng.shuffle(indices)
         self.signals = [self.signals[i] for i in indices]
@@ -85,24 +85,24 @@ class SeismicDataset:
 
     def __getitem__(self, idx):
         if isinstance(idx, slice):
-            # Support slicing like dataset[:10]
+            # Soporte para slicing como dataset[:10]
             return [self.signals[i] for i in range(*idx.indices(len(self)))], \
                    [self.labels[i] for i in range(*idx.indices(len(self)))], \
                    [self.mags[i] for i in range(*idx.indices(len(self)))]
         return self.signals[idx], self.labels[idx], self.mags[idx]
     
     def get_data(self, max_samples=None):
-        """Get all signals, labels, and mags as numpy arrays."""
+        """Obtener todas las señales, etiquetas y mags como arreglos numpy."""
         if max_samples is not None:
             return self.signals[:max_samples], np.array(self.labels[:max_samples]), np.array(self.mags[:max_samples])
         return self.signals, np.array(self.labels), np.array(self.mags)
 
 def download_waveforms():
-    """Download seismic waveform data."""
-    print("Initializing FDSN client...")
+    """Descargar datos de formas de onda sísmicas."""
+    print("Inicializando cliente FDSN...")
     client = Client(DATA_CENTER)
     
-    print(f"Fetching waveform data for station {STATION_CODE}...")
+    print(f"Obteniendo datos de forma de onda para la estación {STATION_CODE}...")
     try:
         st = client.get_waveforms(
             network=NETWORK,
@@ -113,72 +113,72 @@ def download_waveforms():
             endtime=END_TIME
         )
         
-        # Save to file
+        # Guardar en archivo
         output_file = Path(RAW_DATA_PATH) / "waveforms.mseed"
         st.write(str(output_file), format='MSEED')
         
-        print(f"✓ Waveform data saved to {output_file}")
-        print(f"  {len(st)} traces downloaded")
+        print(f"✓ Datos de forma de onda guardados en {output_file}")
+        print(f"  {len(st)} trazas descargadas")
         return st
         
     except Exception as e:
-        print(f"✗ Error downloading waveforms: {e}")
+        print(f"✗ Error descargando formas de onda: {e}")
         return None
 
 
 def takens_embedding(signal, dim, tau):
-    """Takens' embedding
+    """Incrustación de Takens
     Args:
-        signal (np.ndarray): 1D array of the time series signal.
-        dim (int): Embedding dimension.
-        tau (int): Time delay.
+        signal (np.ndarray): Arreglo 1D de la serie temporal.
+        dim (int): Dimensión de incrustación.
+        tau (int): Retardo temporal.
     Returns:
-        np.ndarray: 2D array of shape (m, dim) where m = n - (dim - 1) * tau.
+        np.ndarray: Arreglo 2D de forma (m, dim) donde m = n - (dim - 1) * tau.
     """
     return ecg.takens_embedding(signal, dim, tau)
 
 def compute_persistence(point_cloud, maxdim=1, thresh=np.inf, metric='euclidean'):
-    """Compute persistence diagrams using Ripser.
+    """Calcular diagramas de persistencia usando Ripser.
     
     Args:
-        point_cloud (np.ndarray): 2D array of shape (n_points, n_dimensions) representing the point cloud.
-        maxdim (int): Maximum homology dimension to compute. Default is 1.
-        thresh (float): Maximum filtration value. Default is infinity.
+        point_cloud (np.ndarray): Arreglo 2D de forma (n_points, n_dimensions) representando la nube de puntos.
+        maxdim (int): Dimensión máxima de homología a calcular. Por defecto es 1.
+        thresh (float): Valor máximo de filtración. Por defecto es infinito.
     Returns:
-        list: List of persistence diagrams, one for each dimension up to maxdim.
+        list: Lista de diagramas de persistencia, uno por cada dimensión hasta maxdim.
     """
     return ecg.compute_persistence(point_cloud, maxdim, thresh, metric)
 
 def bottleneck_distance(dgm1, dgm2):
-    """Compute the bottleneck distance between two persistence diagrams.
+    """Calcular la distancia bottleneck entre dos diagramas de persistencia.
     
     Args:
-        dgm1 (np.ndarray): First persistence diagram of shape (n_points, 2).
-        dgm2 (np.ndarray): Second persistence diagram of shape (n_points, 2).
+        dgm1 (np.ndarray): Primer diagrama de persistencia de forma (n_points, 2).
+        dgm2 (np.ndarray): Segundo diagrama de persistencia de forma (n_points, 2).
     
     Returns:
-        float: Bottleneck distance between the two diagrams.
+        float: Distancia bottleneck entre los dos diagramas.
     """
     return ecg.bottleneck_distance(dgm1, dgm2)
 
 def compute_distances(dgm1, dgm2):
-    """Compute bottleneck and Wasserstein distances between two persistence diagrams.
+    """Calcular distancias bottleneck y Wasserstein entre dos diagramas de persistencia.
     
     Args:
-        dgm1 (np.ndarray): First persistence diagram of shape (n_points, 2).
-        dgm2 (np.ndarray): Second persistence diagram of shape (n_points, 2).
+        dgm1 (np.ndarray): Primer diagrama de persistencia de forma (n_points, 2).
+        dgm2 (np.ndarray): Segundo diagrama de persistencia de forma (n_points, 2).
     
     Returns:
-        tuple: (bottleneck_distance, wasserstein_distance). Returns (inf, inf) if either diagram is empty.
+        tuple: (bottleneck_distance, wasserstein_distance). Retorna (inf, inf) si algún diagrama está vacío.
     """
     return ecg.compute_distances(dgm1, dgm2)
 
 def load_datasets(train_path=None, test_path=None, seed=None, max_samples=None):
-    """Load training and test datasets.
+    """Cargar datasets de entrenamiento y prueba.
     
     Args:
-        train_path: Path to training dataset (default: from config)
-        test_path: Path to test dataset (default: from config)
+        train_path: Ruta al dataset de entrenamiento (por defecto: desde config)
+        test_path: Ruta al dataset de prueba (por defecto: desde config)
     
     Returns:
         tuple: (X_train, y_train, X_test, y_test)
@@ -189,7 +189,7 @@ def load_datasets(train_path=None, test_path=None, seed=None, max_samples=None):
         test_path = TEST_DATA_PATH
     
     print("=" * 70)
-    print("Loading Datasets")
+    print("Cargando Datasets")
     print("=" * 70)
     
     train_dataset = SeismicDataset(data_path=Path(train_path), seed=seed)
@@ -198,10 +198,10 @@ def load_datasets(train_path=None, test_path=None, seed=None, max_samples=None):
     X_train, y_train, mag_train = train_dataset.get_data(max_samples=max_samples)
     X_test, y_test, mag_test = test_dataset.get_data(max_samples=int((max_samples)*0.2) if max_samples is not None else None)
     
-    print(f"✓ Datasets loaded successfully")
-    print(f"  Train: {len(train_dataset)} signals")
-    print(f"  Test: {len(test_dataset)} signals")
-    print(f"  Train labels: {np.bincount(y_train)}")
-    print(f"  Test labels: {np.bincount(y_test)}")
+    print(f"✓ Datasets cargados exitosamente")
+    print(f"  Entrenamiento: {len(train_dataset)} señales")
+    print(f"  Prueba: {len(test_dataset)} señales")
+    print(f"  Etiquetas entrenamiento: {np.bincount(y_train)}")
+    print(f"  Etiquetas prueba: {np.bincount(y_test)}")
     
     return X_train, y_train, X_test, y_test

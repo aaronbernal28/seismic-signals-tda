@@ -1,26 +1,26 @@
-# Core scientific computing
+# Computación científica básica
 numpy
 pandas
 scipy
 
-# Seismology and data acquisition
+# Sismología y adquisición de datos
 obspy==1.4.2
 
-# Data storage and manipulation
+# Almacenamiento y manipulación de datos
 h5py==3.15.1
 
-# Visualization
+# Visualización
 matplotlib
 seaborn
 
-# Topological Data Analysis
+# Análisis de datos topológicos
 ripser==0.6.12
 persim==0.3.8
 gudhi==3.11.0
 giotto-tda==0.6.2
 
-# Machine Learning
+# Aprendizaje automático
 scikit-learn
 
-# Audio processing
+# Procesamiento de audio
 librosa==0.11.0

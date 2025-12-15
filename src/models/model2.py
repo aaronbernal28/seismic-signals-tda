@@ -1,4 +1,4 @@
-""" Binary classification model implementation. """
+""" Implementación del modelo de clasificación binaria. """
 
 import numpy as np
 from src.databases import PersistenceDiagramDatabaseTE
@@ -22,21 +22,21 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE, BaseEstimator, Classi
         max_points=500,
         seed=28,
     ):
-        """Initialize the binary classification model.
+        """Inicializar el modelo de clasificación binaria.
         Args:
-            distance: function to compute distance between persistence diagrams
-            weights: sequence of floats, weights for each homology dimension
-            dim: int, embedding dimension
-            tau: int, time delay
-            stride: int, stride for sliding window
-            maxdim: int or None, maximum homology dimension to compute (if None, inferred from weights)
-            sample: int or None, number of diagrams to sample for distance computation
-            thresh: float, threshold for diagram points
-            alpha: float, FPS subsampling proportion
-            max_points: int or np.inf, cap for FPS points
-            seed: int, RNG seed
+            distance: función para calcular distancia entre diagramas de persistencia
+            weights: secuencia de floats, pesos para cada dimensión de homología
+            dim: int, dimensión de incrustación
+            tau: int, retardo temporal
+            stride: int, paso para ventana deslizante
+            maxdim: int o None, dimensión máxima de homología a calcular (si None, inferida de weights)
+            sample: int o None, número de diagramas a muestrear para cálculo de distancia
+            thresh: float, umbral para puntos del diagrama
+            alpha: float, proporción de subsampling FPS
+            max_points: int o np.inf, límite para puntos FPS
+            seed: int, semilla RNG
         """
-        # Store parameters exactly as given (scikit-learn compatibility)
+        # Almacenar parámetros exactamente como se dieron (compatibilidad con scikit-learn)
         self.distance = distance
         self.weights = weights
         self.dim = dim
@@ -49,17 +49,17 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE, BaseEstimator, Classi
         self.max_points = max_points
         self.seed = seed
 
-        # Lazy initialization of the base database once all effective params are known
+        # Inicialización lazy de la base de datos una vez que todos los parámetros efectivos se conocen
         self._initialized = False
         self._normalized_weights = None
 
-    # Internal helpers -----------------------------------------------------
+    # Ayudantes internos -----------------------------------------------------
     def _effective_maxdim(self):
         return (len(self.weights) - 1) if self.maxdim is None else self.maxdim
 
     def _ensure_initialized(self):
         if not self._initialized:
-            # Initialize base database with effective maxdim
+            # Inicializar base de datos con maxdim efectivo
             PersistenceDiagramDatabaseTE.__init__(
                 self,
                 dim=self.dim,
@@ -75,38 +75,38 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE, BaseEstimator, Classi
             w = np.asarray(self.weights, dtype=float)
             s = np.sum(w)
             if s == 0:
-                # If all weights are 0, use equal weights
+                # Si todos los pesos son 0, usar pesos iguales
                 self._normalized_weights = np.ones_like(w) / len(w)
             else:
                 self._normalized_weights = w / s
             self._initialized = True
     
     def __sklearn_is_fitted__(self):
-        """Check if the model is fitted (for scikit-learn compatibility)."""
+        """Verificar si el modelo está ajustado (para compatibilidad con scikit-learn)."""
         return hasattr(self, 'classes_') and self._initialized
     
     def fit(self, X, y, verbose=False):
-        """ Fit the binary classification model. 
+        """ Ajustar el modelo de clasificación binaria. 
         Args:
             X: List[ndarray] (n_samples, ~n_signals)
-            y: List[int] of labels (0 or 1)
+            y: List[int] de etiquetas (0 o 1)
         """
-        # Reset state to prevent data leakage between CV folds
+        # Reiniciar estado para prevenir fuga de datos entre pliegues CV
         self._initialized = False
         self._normalized_weights = None
         
         self._ensure_initialized()
         
-        # Clear database from previous fit (critical for CV)
+        # Limpiar base de datos de ajuste previo (crítico para CV)
         self.db = {label: {d: [] for d in range(self.maxdim + 1)} for label in self.labels}
         
-        # Store classes for scikit-learn compatibility
+        # Almacenar clases para compatibilidad con scikit-learn
         self.classes_ = np.unique(y)
         
         for i, (xs, yi) in enumerate(zip(X, y)):
             self.add_signal(xs, label=yi)
             if verbose and (i % 10 == 0):
-                print(f"Added signal {i}/{len(y)}", end='\r')
+                print(f"Se agregó señal {i}/{len(y)}", end='\r')
         
         if verbose:
             for label in [0, 1]:
@@ -114,38 +114,38 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE, BaseEstimator, Classi
                     pc_len = []
                     for diagrams in self.get_diagrams(label=label, dim=d):
                         pc_len.append(len(diagrams))
-                    # Print statistics
+                    # Imprimir estadísticas
                     if pc_len:
-                        print(f"Label {label}, Dim {d}: Mean diagram size: {np.mean(pc_len):.2f}, Std: {np.std(pc_len):.2f}, Max: {np.max(pc_len)}, Min: {np.min(pc_len)}")
-        print("Model fitting complete.")
+                        print(f"Etiqueta {label}, Dim {d}: Tamaño medio del diagrama: {np.mean(pc_len):.2f}, Desv: {np.std(pc_len):.2f}, Máx: {np.max(pc_len)}, Mín: {np.min(pc_len)}")
+        print("Ajuste del modelo completo.")
         return self
 
     def predict_proba_sample(self, xs):
-        """ Predict the probability for a single sample.
+        """ Predecir la probabilidad para una muestra única.
         Args:
             xs: ndarray (~n_signals,)
         Returns:
-            prob: float in [0, 1]
+            prob: float en [0, 1]
         """
         self._ensure_initialized()
-        # Compute persistence diagram for the input signal
+        # Calcular diagrama de persistencia para la señal de entrada
         try:
             xs_dgm = self.transform(xs)
         except Exception as e:
-            print(f"Error transforming the input signal: {e}")
-            return 0.5  # Return a neutral probability in case of error
+            print(f"Error transformando la señal de entrada: {e}")
+            return 0.5  # Devolver una probabilidad neutral en caso de error
 
         mean_dist_E = []
         mean_dist_N = []
 
         for d in range(self.maxdim + 1):
-            # Only proceed if there are points in the diagram
+            # Proceder solo si hay puntos en el diagrama
             if len(xs_dgm[d]) > 0:
-                # Retrieve diagrams from the database
+                # Recuperar diagramas de la base de datos
                 E_h0 = self.get_diagrams(label=1, dim=d)
                 N_h0 = self.get_diagrams(label=0, dim=d)
                 #print(f"Dimension {d}: {len(E_h0)} diagrams for class 1, {len(N_h0)} diagrams for class 0.", end='\r')
-                # Compute distances
+                # Calcular distancias
                 dists_E = [self.distance(xs_dgm[d], dgm) for dgm in E_h0]
                 dists_N = [self.distance(xs_dgm[d], dgm) for dgm in N_h0]
 
@@ -156,11 +156,11 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE, BaseEstimator, Classi
                 mean_dist_N.append(np.inf) 
 
         #prob = np.exp(mean_dist_E) / (np.exp(mean_dist_E) + np.exp(mean_dist_N))
-        # Ponderate distances with weights between homology dimensions
+        # Ponderar distancias con pesos entre dimensiones de homología
         mean_dist_E = np.sum([w * d for w, d in zip(self._normalized_weights, mean_dist_E)])
         mean_dist_N = np.sum([w * d for w, d in zip(self._normalized_weights, mean_dist_N)])
 
-        # Just to be sure
+        # Solo para estar seguro
         if mean_dist_E == np.inf and mean_dist_N == np.inf:
             prob = 0.5
         elif mean_dist_E == np.inf and mean_dist_N < np.inf:
@@ -172,39 +172,39 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE, BaseEstimator, Classi
         return prob
     
     def predict_proba(self, X):
-        """ Predict probabilities for multiple samples.
+        """ Predecir probabilidades para múltiples muestras.
         Args:
             X: List[ndarray] (n_samples, ~n_signals)
         Returns:
-            probs: ndarray of shape (n_samples, 2) with probabilities for each class
+            probs: ndarray de forma (n_samples, 2) con probabilidades para cada clase
         """
         self._ensure_initialized()
         probs_class1 = [self.predict_proba_sample(xs) for xs in X]
-        # Return 2D array: [prob_class_0, prob_class_1] for each sample
+        # Devolver arreglo 2D: [prob_clase_0, prob_clase_1] para cada muestra
         probs = np.array([[1 - p, p] for p in probs_class1])
         return probs
 
     def predict(self, X):
-        """ Predict class labels for multiple samples.
+        """ Predecir etiquetas de clase para múltiples muestras.
         Args:
             X: List[ndarray] (n_samples, ~n_signals)
         Returns:
-            labels: ndarray of predicted labels (0 or 1)
+            labels: ndarray de etiquetas predichas (0 o 1)
         """
         probs = self.predict_proba(X)
-        # Use probability of class 1 (second column)
+        # Usar probabilidad de clase 1 (segunda columna)
         labels = (probs[:, 1] >= 0.5).astype(int)
         return labels
 
     def score(self, X, y):
-        """ Compute the ROC AUC score.
+        """ Calcular el puntaje ROC AUC.
         Args:
             X: List[ndarray] (n_samples, ~n_signals)
-            y: List[int] of true labels (0 or 1)
+            y: List[int] de etiquetas verdaderas (0 o 1)
         Returns:
-            auc: float ROC AUC score
+            auc: float puntaje ROC AUC
         """
         probs = self.predict_proba(X)
-        # Use probabilities for class 1 (positive class)
+        # Usar probabilidades para clase 1 (clase positiva)
         auc = roc_auc_score(y, probs[:, 1])
         return auc

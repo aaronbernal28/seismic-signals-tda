@@ -159,7 +159,48 @@ def bottleneck_distance(dgm1, dgm2):
     Returns:
         float: Distancia bottleneck entre los dos diagramas.
     """
-    return ecg.bottleneck_distance(dgm1, dgm2)
+    from scipy.optimize import linear_sum_assignment
+    
+    # Handle edge cases
+    if len(dgm1) == 0 and len(dgm2) == 0:
+        return 0.0
+    
+    if len(dgm1) == 0:
+        # All points in dgm2 go to diagonal
+        return max(abs(dgm2[i, 1] - dgm2[i, 0]) / 2.0 for i in range(len(dgm2)))
+    
+    if len(dgm2) == 0:
+        # All points in dgm1 go to diagonal
+        return max(abs(dgm1[i, 1] - dgm1[i, 0]) / 2.0 for i in range(len(dgm1)))
+    
+    n1, n2 = len(dgm1), len(dgm2)
+    n = n1 + n2
+    
+    # Initialize cost matrix
+    cost_matrix = np.zeros((n, n))
+    
+    # Top-left block (n1 x n2): point-to-point matching costs
+    for i in range(n1):
+        for j in range(n2):
+            cost_matrix[i, j] = max(abs(dgm1[i, 0] - dgm2[j, 0]), abs(dgm1[i, 1] - dgm2[j, 1]))
+    
+    # Top-right block (n1 x n1): dgm1 points to diagonal (diagonal matrix)
+    for i in range(n1):
+        persistence = abs(dgm1[i, 1] - dgm1[i, 0])
+        cost_matrix[i, n2 + i] = persistence / 2.0
+    
+    # Bottom-left block (n2 x n2): dgm2 points to diagonal (diagonal matrix)
+    for j in range(n2):
+        persistence = abs(dgm2[j, 1] - dgm2[j, 0])
+        cost_matrix[n1 + j, j] = persistence / 2.0
+    
+    # Bottom-right block (n2 x n1): already zeros (dummy to dummy)
+    
+    # Solve assignment problem
+    row_ind, col_ind = linear_sum_assignment(cost_matrix)
+    
+    # Return maximum cost in the matching
+    return cost_matrix[row_ind, col_ind].max()
 
 def compute_distances(dgm1, dgm2):
     """Calcular distancias bottleneck y Wasserstein entre dos diagramas de persistencia.

@@ -11,7 +11,7 @@ from src.models.model2 import BinaryClassificationTE
 import src.utils as ut
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.metrics import make_scorer, roc_auc_score
-from persim import wasserstein, bottleneck
+from persim import wasserstein
 from src.cache import get_cache
 
 def randomized_search_te(X, y, param_distributions, n_iter=10, cv=3, random_state=28, n_jobs=1):
@@ -109,7 +109,7 @@ def main():
     
     # Distribuciones de parámetros para BinaryClassificationTE (Takens Embedding)
     param_distributions = {
-        'distance': [wasserstein],  # métrica de distancia entre diagramas de persistencia
+        'distance': [wasserstein, ut.bottleneck_distance],  # métrica de distancia entre diagramas de persistencia
         'weights': [(1,), (1, 1), (2, 1), (1, 2)],  # pesos para el cálculo de distancia (tuplas para compatibilidad)
         'sample': list(range(10, 20)),  # cantidad de diagramas a muestrear
         'thresh': np.linspace(1000, 3000, 10),  # umbral
@@ -129,10 +129,10 @@ def main():
     # =========================================================================
     # PARÁMETROS DE LA BÚSQUEDA
     # =========================================================================
-    n_iter = 100  # número de combinaciones aleatorias por modelo
+    n_iter = 200  # número de combinaciones aleatorias por modelo
     cv_folds = 3  # número de pliegues de validación cruzada
     random_state = 28  # semilla para reproducibilidad
-    n_jobs = 10  # número de trabajos paralelos para RandomizedSearchCV
+    n_jobs = -1  # número de trabajos paralelos para RandomizedSearchCV
     
     # =========================================================================
     # EJECUTAR BÚSQUEDA ALEATORIA PARA EL MODELO 2 (Takens Embedding)

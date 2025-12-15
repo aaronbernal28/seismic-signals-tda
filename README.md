@@ -52,7 +52,7 @@ seismic-signals-tda/
 - **Almacenamiento de datos**: HDF5 (h5py)
 
 ## Instalación
-Se recomienda usar Python entre las versiones 3.9 y 3.13.
+Se recomienda usar Python 3.12.9.
 
 ```bash
 pip install --upgrade pip

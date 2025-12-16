@@ -27,7 +27,7 @@ import src.utils as ut
 
 # Configuración para el modelo TE basada en run_grid_search.py
 BEST_PARAMS = {
-    'distance': wasserstein,
+    'distance': ut.bottleneck_distance,
     'weights': (2, 1),
     'thresh': 1888.8889,
     'tau': 4,
@@ -39,7 +39,7 @@ BEST_PARAMS = {
 }
 
 # La búsqueda de cuadrícula usó seed=28, así que debemos usarla aquí para reproducibilidad
-MODEL_SEED = 28 
+MODEL_SEED = 28
 
 RESULTS_DIR = Path(__file__).parent.parent / "data" / "results" / "best_model_analysis"
 
@@ -116,7 +116,7 @@ def main():
     """Flujo de ejecución principal."""
     # Configuración
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    np.random.seed(42)
+    np.random.seed(MODEL_SEED)
     
     print("=" * 70)
     print("EVALUACIÓN Y EXPLORACIÓN DEL MEJOR MODELO")

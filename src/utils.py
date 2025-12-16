@@ -160,46 +160,50 @@ def bottleneck_distance(dgm1, dgm2):
         float: Distancia bottleneck entre los dos diagramas.
     """
     from scipy.optimize import linear_sum_assignment
-    
+
+    # Filtrar puntos con coordenadas infinitas para evitar matrices inviables
+    dgm1 = dgm1[np.isfinite(dgm1).all(axis=1)]
+    dgm2 = dgm2[np.isfinite(dgm2).all(axis=1)]
+
     # Handle edge cases
     if len(dgm1) == 0 and len(dgm2) == 0:
         return 0.0
-    
+
     if len(dgm1) == 0:
-        # All points in dgm2 go to diagonal
         return max(abs(dgm2[i, 1] - dgm2[i, 0]) / 2.0 for i in range(len(dgm2)))
-    
+
     if len(dgm2) == 0:
-        # All points in dgm1 go to diagonal
         return max(abs(dgm1[i, 1] - dgm1[i, 0]) / 2.0 for i in range(len(dgm1)))
-    
+
     n1, n2 = len(dgm1), len(dgm2)
     n = n1 + n2
-    
-    # Initialize cost matrix
-    cost_matrix = np.zeros((n, n))
-    
+
+    # Inicializar matriz de costos con infinito
+    cost_matrix = np.full((n, n), np.inf)
+
     # Top-left block (n1 x n2): point-to-point matching costs
     for i in range(n1):
         for j in range(n2):
-            cost_matrix[i, j] = max(abs(dgm1[i, 0] - dgm2[j, 0]), abs(dgm1[i, 1] - dgm2[j, 1]))
-    
-    # Top-right block (n1 x n1): dgm1 points to diagonal (diagonal matrix)
+            cost_matrix[i, j] = max(
+                abs(dgm1[i, 0] - dgm2[j, 0]),
+                abs(dgm1[i, 1] - dgm2[j, 1])
+            )
+
+    # Top-right block (n1 x n1): match dgm1 points to their diagonal slots
     for i in range(n1):
         persistence = abs(dgm1[i, 1] - dgm1[i, 0])
         cost_matrix[i, n2 + i] = persistence / 2.0
-    
-    # Bottom-left block (n2 x n2): dgm2 points to diagonal (diagonal matrix)
+
+    # Bottom-left block (n2 x n2): match dgm2 points to their diagonal slots
     for j in range(n2):
         persistence = abs(dgm2[j, 1] - dgm2[j, 0])
         cost_matrix[n1 + j, j] = persistence / 2.0
-    
-    # Bottom-right block (n2 x n1): already zeros (dummy to dummy)
-    
+
+    # Bottom-right block (dummy-to-dummy) stays inf; not used
+
     # Solve assignment problem
     row_ind, col_ind = linear_sum_assignment(cost_matrix)
-    
-    # Return maximum cost in the matching
+
     return cost_matrix[row_ind, col_ind].max()
 
 def compute_distances(dgm1, dgm2):

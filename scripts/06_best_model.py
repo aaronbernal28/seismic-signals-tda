@@ -17,7 +17,7 @@ from sklearn.metrics import (
     confusion_matrix, 
     roc_curve
 )
-from persim import wasserstein
+from persim import wasserstein, plot_diagrams
 
 # Agregar directorio padre al path para importar módulos src
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -76,6 +76,92 @@ def plot_roc_curve(y_true, y_proba, auc_score, save_path):
     plt.close()
     print(f"✓ Curva ROC guardada en {save_path}")
 
+
+def plot_examples_grid(X, y, y_pred, y_proba, samples_per_class, model, model_params, save_path, seed=None, min_h0_points=10):
+    """Graficar diagramas de persistencia por clase en una grilla 2xN.
+    Selecciona señales con H0 suficiente y muestrea de forma estratificada por probabilidad: baja/medio/alta P(Terr).
+    """
+    classes = [0, 1]
+    fig, axes = plt.subplots(2, samples_per_class, figsize=(3.5 * samples_per_class, 7), sharex=False)
+
+    # Si samples_per_class == 1, axes no es 2D; normalizar
+    if samples_per_class == 1:
+        axes = np.array([axes]).reshape(2, 1)
+
+    # Use seeded random sampling for reproducibility
+    rng = np.random.default_rng(seed)
+
+    for row, cls in enumerate(classes):
+        idx_cls = np.where(y == cls)[0]
+        
+        # Filtrar índices con diagramas H0 válidos
+        valid_idx_cls = []
+        for idx in idx_cls:
+            sig = X[idx]
+            try:
+                dgms = model.transform(sig)
+                dgm_h0 = dgms[0]
+                dgm_h0_finite = dgm_h0[dgm_h0[:, 1] != np.inf] if len(dgm_h0) > 0 else dgm_h0
+                if len(dgm_h0_finite) >= min_h0_points:
+                    valid_idx_cls.append(idx)
+            except:
+                continue
+        
+        # Estratificar por probabilidad P(terr) en bins: bajo, medio, alto
+        chosen = []
+        if len(valid_idx_cls) > 0:
+            probs_cls1 = y_proba[valid_idx_cls]
+            low_bin = [idx for idx, p in zip(valid_idx_cls, probs_cls1) if p <= 0.33]
+            mid_bin = [idx for idx, p in zip(valid_idx_cls, probs_cls1) if 0.33 < p <= 0.67]
+            high_bin = [idx for idx, p in zip(valid_idx_cls, probs_cls1) if p > 0.67]
+
+            # Tomar uno por bin si existe
+            for bin_idxs in (low_bin, mid_bin, high_bin):
+                if bin_idxs:
+                    chosen.append(rng.choice(bin_idxs))
+
+            # Rellenar restantes (si faltan) de los válidos restantes
+            remaining_slots = samples_per_class - len(chosen)
+            if remaining_slots > 0:
+                remaining_pool = [idx for idx in valid_idx_cls if idx not in chosen]
+                if len(remaining_pool) > 0:
+                    if len(remaining_pool) > remaining_slots:
+                        extra = rng.choice(remaining_pool, size=remaining_slots, replace=False)
+                        chosen.extend(list(extra))
+                    else:
+                        chosen.extend(remaining_pool)
+
+        for col in range(samples_per_class):
+            ax = axes[row, col]
+            if col < len(chosen):
+                idx = chosen[col]
+                sig = X[idx]
+                # Compute persistence diagrams using model's transform
+                dgms = model.transform(sig)
+                # Plot persistence diagrams
+                plot_diagrams(dgms, ax=ax, legend=False)
+                
+                # Get prediction info
+                true_label = 'Ruido' if cls == 0 else 'Terremoto'
+                prob_noise = 1 - y_proba[idx]  # P(class 0)
+                prob_earthquake = y_proba[idx]  # P(class 1)
+                
+                # Create clearer title
+                title = f"#{idx}: {true_label}\n"
+                title += f"P(Ruido)={prob_noise:.2f} | P(Terr)={prob_earthquake:.2f}"
+                ax.set_title(title, fontsize=8.5)
+            else:
+                ax.axis('off')
+
+            if col == 0:
+                label_name = 'Ruido (Clase 0)' if cls == 0 else 'Terremoto (Clase 1)'
+                ax.set_ylabel(label_name, fontsize=10, fontweight='bold')
+
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=150)
+    plt.close(fig)
+    print(f"✓ Ejemplos guardados en {save_path}")
+
 def analyze_errors(X_test, y_test, y_pred, y_proba):
     """Realizar análisis de muestras mal clasificadas."""
     # Identificar índices
@@ -111,6 +197,73 @@ def analyze_errors(X_test, y_test, y_pred, y_proba):
             prob = fn_probs[idx]
             sig = X_test[orig_idx]
             print(f"  - Índice {orig_idx}: Prob(Terremoto)={prob:.4f}, Media de Señal={np.mean(sig):.2e}, Desv={np.std(sig):.2e}")
+
+def filter_empty_diagrams(X, y, model_params, min_h1_points=15, verbose=True):
+    """Filtrar señales que producen diagramas H1 vacíos o con muy pocos puntos.
+    
+    Args:
+        X: Lista de señales
+        y: Array de etiquetas
+        model_params: Diccionario con parámetros del modelo
+        min_h1_points: Número mínimo de puntos requeridos en H1 (por defecto 3)
+        verbose: Mostrar información de filtrado
+    
+    Returns:
+        tuple: (X_filtered, y_filtered, num_removed)
+    """
+    valid_indices = []
+    
+    for idx, signal in enumerate(X):
+        try:
+            # Computar embedding de Takens
+            embedding = ut.takens_embedding(
+                signal,
+                dim=model_params['dim'],
+                tau=model_params['tau']
+            )
+            
+            # Limitar puntos si es necesario
+            if len(embedding) > model_params['max_points']:
+                step = len(embedding) // model_params['max_points']
+                embedding = embedding[::step][:model_params['max_points']]
+            
+            # Computar diagramas de persistencia
+            dgms = ut.compute_persistence(
+                embedding,
+                maxdim=1,
+                thresh=model_params['thresh']
+            )
+            
+            # Verificar si H1 tiene suficientes puntos
+            dgm_h1 = dgms[1]
+            dgm_h1_finite = dgm_h1[dgm_h1[:, 1] != np.inf] if len(dgm_h1) > 0 else dgm_h1
+            
+            # Solo mantener señales con al menos min_h1_points puntos en H1
+            if len(dgm_h1_finite) >= min_h1_points:
+                valid_indices.append(idx)
+        except Exception as e:
+            # Si hay error, excluir la señal
+            if verbose:
+                print(f"Error procesando señal {idx}: {e}")
+            continue
+    
+    num_removed = len(X) - len(valid_indices)
+    
+    if num_removed > 0 and verbose:
+        removed_by_label = {}
+        for i, (signal, label) in enumerate(zip(X, y)):
+            if i not in valid_indices:
+                removed_by_label[label] = removed_by_label.get(label, 0) + 1
+        
+        print(f"\n⚠ ADVERTENCIA: {num_removed} señal(es) removida(s) (H1 con menos de {min_h1_points} puntos)")
+        for label, count in removed_by_label.items():
+            label_name = 'Terremoto' if label == 1 else 'Ruido'
+            print(f"  - {label_name} (etiqueta {label}): {count} señal(es)")
+    
+    X_filtered = [X[i] for i in valid_indices]
+    y_filtered = y[valid_indices]
+    
+    return X_filtered, y_filtered, num_removed
 
 def main():
     """Flujo de ejecución principal."""
@@ -195,6 +348,18 @@ def main():
     
     plot_confusion_matrix(y_test, y_pred, RESULTS_DIR / "confusion_matrix.png")
     plot_roc_curve(y_test, y_proba, auc, RESULTS_DIR / "roc_curve.png")
+    plot_examples_grid(
+        X_test,
+        y_test,
+        y_pred,
+        y_proba,
+        samples_per_class=3,
+        model=model,
+        model_params=BEST_PARAMS,
+        save_path=RESULTS_DIR / "examples_grid.png",
+        seed=42,  # Different seed for varied examples
+        min_h0_points=10,
+    )
     
     # 7. Análisis de Errores
     analyze_errors(X_test, y_test, y_pred, y_proba)

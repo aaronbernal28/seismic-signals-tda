@@ -21,6 +21,7 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE, BaseEstimator, Classi
         alpha=0.1,
         max_points=500,
         seed=28,
+        normalize_minmax=True,
     ):
         """Inicializar el modelo de clasificación binaria.
         Args:
@@ -35,6 +36,7 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE, BaseEstimator, Classi
             alpha: float, proporción de subsampling FPS
             max_points: int o np.inf, límite para puntos FPS
             seed: int, semilla RNG
+            normalize_minmax: bool, normalizar cada señal a [0,1] antes de Takens
         """
         # Almacenar parámetros exactamente como se dieron (compatibilidad con scikit-learn)
         self.distance = distance
@@ -48,6 +50,7 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE, BaseEstimator, Classi
         self.alpha = alpha
         self.max_points = max_points
         self.seed = seed
+        self.normalize_minmax = normalize_minmax
 
         # Inicialización lazy de la base de datos una vez que todos los parámetros efectivos se conocen
         self._initialized = False
@@ -71,6 +74,7 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE, BaseEstimator, Classi
                 alpha=self.alpha,
                 max_points=self.max_points,
                 seed=self.seed,
+                normalize_minmax=self.normalize_minmax,
             )
             w = np.asarray(self.weights, dtype=float)
             s = np.sum(w)

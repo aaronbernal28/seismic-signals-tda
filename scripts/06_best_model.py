@@ -27,9 +27,9 @@ import src.utils as ut
 
 # Configuración para el modelo TE basada en run_grid_search.py
 BEST_PARAMS = {
-    'distance': ut.bottleneck_distance,
+    'distance': wasserstein,
     'weights': (2, 1),
-    'thresh': 1888.8889,
+    'thresh': np.inf,
     'tau': 4,
     'stride': 1,
     'sample': 16,
@@ -48,8 +48,8 @@ def plot_confusion_matrix(y_true, y_pred, save_path):
     cm = confusion_matrix(y_true, y_pred)
     plt.figure(figsize=(8, 6))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False,
-                xticklabels=['Ruido', 'Terremoto'],
-                yticklabels=['Ruido', 'Terremoto'])
+                xticklabels=['Ruido', 'Sismo'],
+                yticklabels=['Ruido', 'Sismo'])
     plt.title('Matriz de Confusión', fontsize=14)
     plt.ylabel('Etiqueta Verdadera', fontsize=12)
     plt.xlabel('Etiqueta Predicha', fontsize=12)
@@ -77,9 +77,10 @@ def plot_roc_curve(y_true, y_proba, auc_score, save_path):
     print(f"✓ Curva ROC guardada en {save_path}")
 
 
-def plot_examples_grid(X, y, y_pred, y_proba, samples_per_class, model, model_params, save_path, seed=None, min_h0_points=10):
+def plot_examples_grid(X, y, y_pred, y_proba, samples_per_class, model, model_params, save_path, signals_save_path=None, seed=None, min_h0_points=10):
     """Graficar diagramas de persistencia por clase en una grilla 2xN.
-    Selecciona señales con H0 suficiente y muestrea de forma estratificada por probabilidad: baja/medio/alta P(Terr).
+    Selecciona señales con H0 suficiente y toma muestras aleatorias simples (sin estratificar).
+    Si signals_save_path se indica, genera también un panel con las mismas señales en el dominio temporal.
     """
     classes = [0, 1]
     fig, axes = plt.subplots(2, samples_per_class, figsize=(3.5 * samples_per_class, 7), sharex=False)
@@ -107,29 +108,11 @@ def plot_examples_grid(X, y, y_pred, y_proba, samples_per_class, model, model_pa
             except:
                 continue
         
-        # Estratificar por probabilidad P(terr) en bins: bajo, medio, alto
+        # Muestreo simple: elegir hasta samples_per_class aleatorios válidos
         chosen = []
         if len(valid_idx_cls) > 0:
-            probs_cls1 = y_proba[valid_idx_cls]
-            low_bin = [idx for idx, p in zip(valid_idx_cls, probs_cls1) if p <= 0.33]
-            mid_bin = [idx for idx, p in zip(valid_idx_cls, probs_cls1) if 0.33 < p <= 0.67]
-            high_bin = [idx for idx, p in zip(valid_idx_cls, probs_cls1) if p > 0.67]
-
-            # Tomar uno por bin si existe
-            for bin_idxs in (low_bin, mid_bin, high_bin):
-                if bin_idxs:
-                    chosen.append(rng.choice(bin_idxs))
-
-            # Rellenar restantes (si faltan) de los válidos restantes
-            remaining_slots = samples_per_class - len(chosen)
-            if remaining_slots > 0:
-                remaining_pool = [idx for idx in valid_idx_cls if idx not in chosen]
-                if len(remaining_pool) > 0:
-                    if len(remaining_pool) > remaining_slots:
-                        extra = rng.choice(remaining_pool, size=remaining_slots, replace=False)
-                        chosen.extend(list(extra))
-                    else:
-                        chosen.extend(remaining_pool)
+            k = min(samples_per_class, len(valid_idx_cls))
+            chosen = list(rng.choice(valid_idx_cls, size=k, replace=False))
 
         for col in range(samples_per_class):
             ax = axes[row, col]
@@ -142,25 +125,73 @@ def plot_examples_grid(X, y, y_pred, y_proba, samples_per_class, model, model_pa
                 plot_diagrams(dgms, ax=ax, legend=False)
                 
                 # Get prediction info
-                true_label = 'Ruido' if cls == 0 else 'Terremoto'
-                prob_noise = 1 - y_proba[idx]  # P(class 0)
+                true_label = 'Ruido' if cls == 0 else 'Sismo'
                 prob_earthquake = y_proba[idx]  # P(class 1)
-                
+
                 # Create clearer title
                 title = f"#{idx}: {true_label}\n"
-                title += f"P(Ruido)={prob_noise:.2f} | P(Terr)={prob_earthquake:.2f}"
+                title += f"P(Sismo)={prob_earthquake:.2f}"
                 ax.set_title(title, fontsize=8.5)
             else:
                 ax.axis('off')
 
             if col == 0:
-                label_name = 'Ruido (Clase 0)' if cls == 0 else 'Terremoto (Clase 1)'
+                label_name = 'Ruido (Clase 0)' if cls == 0 else 'Sismo (Clase 1)'
                 ax.set_ylabel(label_name, fontsize=10, fontweight='bold')
 
     fig.tight_layout()
     fig.savefig(save_path, dpi=150)
     plt.close(fig)
     print(f"✓ Ejemplos guardados en {save_path}")
+
+    # Graficar las mismas señales en el dominio temporal
+    if signals_save_path is not None:
+        fig2, axes2 = plt.subplots(2, samples_per_class, figsize=(3.5 * samples_per_class, 6), sharex=False)
+        if samples_per_class == 1:
+            axes2 = np.array([axes2]).reshape(2, 1)
+
+        for row, cls in enumerate(classes):
+            # Recorrer nuevamente para usar los mismos índices elegidos
+            idx_cls = np.where(y == cls)[0]
+            valid_idx_cls = []
+            for idx in idx_cls:
+                sig = X[idx]
+                try:
+                    dgms = model.transform(sig)
+                    dgm_h0 = dgms[0]
+                    dgm_h0_finite = dgm_h0[dgm_h0[:, 1] != np.inf] if len(dgm_h0) > 0 else dgm_h0
+                    if len(dgm_h0_finite) >= min_h0_points:
+                        valid_idx_cls.append(idx)
+                except:
+                    continue
+
+            chosen_cls = []
+            if len(valid_idx_cls) > 0:
+                k = min(samples_per_class, len(valid_idx_cls))
+                chosen_cls = list(rng.choice(valid_idx_cls, size=k, replace=False))
+
+            for col in range(samples_per_class):
+                ax2 = axes2[row, col]
+                if col < len(chosen_cls):
+                    idx = chosen_cls[col]
+                    sig = X[idx]
+                    ax2.plot(sig, linewidth=0.6, color='tab:blue' if cls == 0 else 'tab:red')
+                    label_name = 'Ruido' if cls == 0 else 'Sismo'
+                    ax2.set_title(f"#{idx} | {label_name}", fontsize=8.5)
+                    ax2.grid(True, alpha=0.3)
+                else:
+                    ax2.axis('off')
+
+                if col == 0:
+                    ax2.set_ylabel('Amplitud', fontsize=9)
+            for ax2_col in axes2[row, :]:
+                ax2_col.set_xticks([])
+                ax2_col.set_yticks([])
+
+        fig2.tight_layout()
+        fig2.savefig(signals_save_path, dpi=150)
+        plt.close(fig2)
+        print(f"✓ Señales temporales guardadas en {signals_save_path}")
 
 def analyze_errors(X_test, y_test, y_pred, y_proba):
     """Realizar análisis de muestras mal clasificadas."""
@@ -171,8 +202,8 @@ def analyze_errors(X_test, y_test, y_pred, y_proba):
     print(f"\n{'=' * 40}")
     print("ANÁLISIS DE ERRORES")
     print(f"{'=' * 40}")
-    print(f"Falsos Positivos (Ruido predicho como Terremoto): {len(false_positives)}")
-    print(f"Falsos Negativos (Terremoto predicho como Ruido): {len(false_negatives)}")
+    print(f"Falsos Positivos (Ruido predicho como Sismo): {len(false_positives)}")
+    print(f"Falsos Negativos (Sismo predicho como Ruido): {len(false_negatives)}")
     
     if len(false_positives) > 0:
         print("\nPrincipales Falsos Positivos (predicciones incorrectas de mayor confianza):")
@@ -184,7 +215,7 @@ def analyze_errors(X_test, y_test, y_pred, y_proba):
             orig_idx = false_positives[idx]
             prob = fp_probs[idx]
             sig = X_test[orig_idx]
-            print(f"  - Índice {orig_idx}: Prob(Terremoto)={prob:.4f}, Media de Señal={np.mean(sig):.2e}, Desv={np.std(sig):.2e}")
+            print(f"  - Índice {orig_idx}: Prob(Sismo)={prob:.4f}, Media de Señal={np.mean(sig):.2e}, Desv={np.std(sig):.2e}")
 
     if len(false_negatives) > 0:
         print("\nPrincipales Falsos Negativos (predicciones incorrectas de menor confianza):")
@@ -196,7 +227,7 @@ def analyze_errors(X_test, y_test, y_pred, y_proba):
             orig_idx = false_negatives[idx]
             prob = fn_probs[idx]
             sig = X_test[orig_idx]
-            print(f"  - Índice {orig_idx}: Prob(Terremoto)={prob:.4f}, Media de Señal={np.mean(sig):.2e}, Desv={np.std(sig):.2e}")
+            print(f"  - Índice {orig_idx}: Prob(Sismo)={prob:.4f}, Media de Señal={np.mean(sig):.2e}, Desv={np.std(sig):.2e}")
 
 def filter_empty_diagrams(X, y, model_params, min_h1_points=15, verbose=True):
     """Filtrar señales que producen diagramas H1 vacíos o con muy pocos puntos.
@@ -257,7 +288,7 @@ def filter_empty_diagrams(X, y, model_params, min_h1_points=15, verbose=True):
         
         print(f"\n⚠ ADVERTENCIA: {num_removed} señal(es) removida(s) (H1 con menos de {min_h1_points} puntos)")
         for label, count in removed_by_label.items():
-            label_name = 'Terremoto' if label == 1 else 'Ruido'
+            label_name = 'Sismo' if label == 1 else 'Ruido'
             print(f"  - {label_name} (etiqueta {label}): {count} señal(es)")
     
     X_filtered = [X[i] for i in valid_indices]
@@ -331,7 +362,7 @@ def main():
     # 5. Cálculo de Métricas
     acc = accuracy_score(y_test, y_pred)
     auc = roc_auc_score(y_test, y_proba)
-    report = classification_report(y_test, y_pred, target_names=['Ruido', 'Terremoto'])
+    report = classification_report(y_test, y_pred, target_names=['Ruido', 'Sismo'])
     
     # Imprimir Métricas
     print(f"\n{'=' * 70}")
@@ -357,6 +388,7 @@ def main():
         model=model,
         model_params=BEST_PARAMS,
         save_path=RESULTS_DIR / "examples_grid.png",
+        signals_save_path=RESULTS_DIR / "examples_signals.png",
         seed=42,  # Different seed for varied examples
         min_h0_points=10,
     )

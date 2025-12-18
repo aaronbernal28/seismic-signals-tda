@@ -6,7 +6,7 @@ import librosa
 from src.cache import get_cache
 
 class PersistenceDiagramDatabaseTE:
-    def __init__(self, labels=[0, 1], dim=100, tau=10, stride=1, maxdim=2, sample=None, thresh=np.inf, alpha=0.1, max_points=500, seed=28):
+    def __init__(self, labels=[0, 1], dim=100, tau=10, stride=1, maxdim=2, sample=None, thresh=np.inf, alpha=0.1, max_points=500, seed=28, normalize_minmax=True):
         """Inicializar la base de datos de diagramas de persistencia.
         Args:
             labels (list): Lista de identificadores únicos para los diagramas.
@@ -17,6 +17,7 @@ class PersistenceDiagramDatabaseTE:
             sample (int, opcional): Si se indica, muestrea aleatoriamente esa cantidad de diagramas.
             thresh (float): Umbral para el complejo de Vietoris-Rips.
             alpha (float): Proporción de subsampling.
+            normalize_minmax (bool): Si True, normaliza cada señal a [0, 1] antes de Takens.
         """
         self.labels = labels
         self.maxdim = maxdim
@@ -26,6 +27,7 @@ class PersistenceDiagramDatabaseTE:
         self.thresh = thresh
         self.alpha = alpha
         self.max_points = max_points
+        self.normalize_minmax = normalize_minmax
         # Guardar parámetros TE explícitamente para usos posteriores (por ejemplo, grid search)
         self.dim = dim
         self.tau = tau
@@ -90,12 +92,18 @@ class PersistenceDiagramDatabaseTE:
         
         # Calcular la incrustación de Takens
         try:
+            x = signal.astype(np.float32).copy()
+            if self.normalize_minmax:
+                min_val = np.min(x)
+                max_val = np.max(x)
+                denom = max_val - min_val
+                x = (x - min_val) / denom if denom != 0 else np.zeros_like(x)
             # TakensEmbedding requiere entrada 2D: (n_samples, n_timestamps)
             # Reajustar señal 1D a 2D si hace falta
-            if signal.ndim == 1:
-                signal_2d = signal.reshape(1, -1)
+            if x.ndim == 1:
+                signal_2d = x.reshape(1, -1)
             else:
-                signal_2d = signal
+                signal_2d = x
             
             # Usar fit_transform en lugar de transform (no es necesario llamar a fit por separado)
             embedded = self.TE.fit_transform(signal_2d)

@@ -24,3 +24,6 @@ scikit-learn==1.3.2
 
 # Procesamiento de audio
 librosa==0.11.0
+
+# Manipulación de grafos
+networkx==3.6.1

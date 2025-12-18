@@ -17,13 +17,14 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.models.model2 import BinaryClassificationTE
+from persim import wasserstein
 import src.utils as ut
 
 # Parametros optimos tomados de 06_best_model.py (grid_search_te rango 1)
 BEST_PARAMS = {
-    "distance": ut.bottleneck_distance,
+    "distance": wasserstein,
     "weights": (2, 1),
-    "thresh": 1888.8889,
+    "thresh": np.inf,
     "tau": 4,
     "stride": 1,
     "sample": 16,
@@ -34,7 +35,6 @@ BEST_PARAMS = {
 
 MODEL_SEED = 28
 RESULTS_DIR = Path(__file__).parent.parent / "data" / "results" / "best_model_analysis"
-DIST_MATRIX_PATH = RESULTS_DIR / "distance_matrix.npy"
 GRAPH_PATH = RESULTS_DIR / "distance_graph.png"
 
 
@@ -134,7 +134,7 @@ def graficar_grafo(G, labels, save_path):
     leyenda = [
         Line2D([0], [0], marker="o", color="w", label="Ruido (clase 0)",
                markerfacecolor="#1f77b4", markersize=8),
-        Line2D([0], [0], marker="o", color="w", label="Terremoto (clase 1)",
+        Line2D([0], [0], marker="o", color="w", label="Sismo (clase 1)",
                markerfacecolor="#d62728", markersize=8),
     ]
     plt.legend(handles=leyenda, loc="lower left")
@@ -164,8 +164,6 @@ def main():
 
     print("Calculando matriz de distancias bottleneck...")
     dist_matrix = construir_matriz_distancias(model, diagrams)
-    np.save(DIST_MATRIX_PATH, dist_matrix)
-    print(f"✓ Matriz de distancias guardada en {DIST_MATRIX_PATH}")
 
     print("Construyendo y graficando grafo k-NN...")
     grafo = construir_grafo(dist_matrix, y_test_filtrado)

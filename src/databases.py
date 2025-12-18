@@ -1,5 +1,5 @@
 import numpy as np
-from src.utils import compute_persistence
+from src.utils import compute_persistence, normalize_minmax
 from gudhi.subsampling import choose_n_farthest_points as fps
 from gtda.time_series import TakensEmbedding
 import librosa
@@ -92,12 +92,7 @@ class PersistenceDiagramDatabaseTE:
         
         # Calcular la incrustación de Takens
         try:
-            x = signal.astype(np.float32).copy()
-            if self.normalize_minmax:
-                min_val = np.min(x)
-                max_val = np.max(x)
-                denom = max_val - min_val
-                x = (x - min_val) / denom if denom != 0 else np.zeros_like(x)
+            x = normalize_minmax(signal) if self.normalize_minmax else signal.astype(np.float32).copy()
             # TakensEmbedding requiere entrada 2D: (n_samples, n_timestamps)
             # Reajustar señal 1D a 2D si hace falta
             if x.ndim == 1:

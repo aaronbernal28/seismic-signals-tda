@@ -6,6 +6,17 @@ import h5py
 import numpy as np
 import matplotlib.pyplot as plt
 
+
+def normalize_minmax(signal):
+    """Normalizar una señal a [0, 1]. Si la señal es constante, devuelve ceros."""
+    x = np.asarray(signal, dtype=np.float32)
+    min_val = np.min(x)
+    max_val = np.max(x)
+    denom = max_val - min_val
+    if denom == 0:
+        return np.zeros_like(x)
+    return (x - min_val) / denom
+
 def plot_waveform(signal, label='Earthquake', mag=0):
     """Graficar forma de onda para un intervalo dado."""
     time = np.arange(len(signal))  # Asumir pasos de tiempo empezando desde 0

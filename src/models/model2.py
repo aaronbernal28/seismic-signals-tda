@@ -122,7 +122,7 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE, BaseEstimator, Classi
         if skipped_count > 0:
             print(f"\n⚠ Señales omitidas durante entrenamiento: {skipped_count}")
             for label, count in skipped_by_label.items():
-                label_name = 'Terremoto' if label == 1 else 'Ruido'
+                label_name = 'Sismo' if label == 1 else 'Ruido'
                 print(f"  - {label_name} (etiqueta {label}): {count} señal(es)")
         
         if verbose:

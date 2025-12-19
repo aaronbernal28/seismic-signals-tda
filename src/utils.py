@@ -270,7 +270,7 @@ def filter_valid_signals(X, y, dim, tau, verbose=True):
         
         print(f"\n⚠ ADVERTENCIA: {num_removed} señal(es) removida(s) (longitud < {min_length})")
         for label, count in removed_by_label.items():
-            label_name = 'Terremoto' if label == 1 else 'Ruido'
+            label_name = 'Sismo' if label == 1 else 'Ruido'
             print(f"  - {label_name} (etiqueta {label}): {count} señal(es)")
     
     X_filtered = [X[i] for i in valid_indices]

@@ -111,7 +111,7 @@ def print_statistics(results):
     
     print("\n--- Por Clase ---")
     for label in [0, 1]:
-        label_name = "Ruido" if label == 0 else "Terremoto"
+        label_name = "Ruido" if label == 0 else "Sismo"
         mask = labels == label
         print(f"\n{label_name} (Clase {label}):")
         print(f"  H0 vacíos: {np.sum((dgm_h0_sizes[mask] == 0))} de {np.sum(mask)}")
@@ -138,7 +138,7 @@ def find_problematic_signals(results, top_n=10):
         
         for i, idx in enumerate(empty_h1_indices[:top_n]):
             result_idx = np.where(indices == idx)[0][0]
-            label_name = "Ruido" if results['label'][result_idx] == 0 else "Terremoto"
+            label_name = "Ruido" if results['label'][result_idx] == 0 else "Sismo"
             print(f"\nSeñal {idx} ({label_name}):")
             print(f"  Longitud: {results['signal_length'][result_idx]}")
             print(f"  Embedding size: {results['embedding_size'][result_idx]}")
@@ -158,7 +158,7 @@ def find_problematic_signals(results, top_n=10):
         
         for i, idx in enumerate(small_h1_indices[:top_n]):
             result_idx = np.where(indices == idx)[0][0]
-            label_name = "Ruido" if results['label'][result_idx] == 0 else "Terremoto"
+            label_name = "Ruido" if results['label'][result_idx] == 0 else "Sismo"
             print(f"\nSeñal {idx} ({label_name}):")
             print(f"  H0 tamaño: {results['dgm_h0_size'][result_idx]}")
             print(f"  H1 tamaño: {results['dgm_h1_size'][result_idx]}")
@@ -178,7 +178,7 @@ def plot_signal_properties(results, save_path):
     
     # Plot 1: Distribución de tamaños H0
     axes[0, 0].hist([dgm_h0_sizes[labels == 0], dgm_h0_sizes[labels == 1]], 
-                     bins=20, label=['Ruido', 'Terremoto'], alpha=0.7)
+                     bins=20, label=['Ruido', 'Sismo'], alpha=0.7)
     axes[0, 0].set_xlabel('Tamaño H0')
     axes[0, 0].set_ylabel('Frecuencia')
     axes[0, 0].set_title('Distribución Tamaño H0')
@@ -187,7 +187,7 @@ def plot_signal_properties(results, save_path):
     
     # Plot 2: Distribución de tamaños H1
     axes[0, 1].hist([dgm_h1_sizes[labels == 0], dgm_h1_sizes[labels == 1]], 
-                     bins=20, label=['Ruido', 'Terremoto'], alpha=0.7)
+                     bins=20, label=['Ruido', 'Sismo'], alpha=0.7)
     axes[0, 1].set_xlabel('Tamaño H1')
     axes[0, 1].set_ylabel('Frecuencia')
     axes[0, 1].set_title('Distribución Tamaño H1')
@@ -197,7 +197,7 @@ def plot_signal_properties(results, save_path):
     # Plot 3: H1 vs Desviación Estándar
     for label in [0, 1]:
         mask = labels == label
-        label_name = "Ruido" if label == 0 else "Terremoto"
+        label_name = "Ruido" if label == 0 else "Sismo"
         axes[0, 2].scatter(signal_stds[mask], dgm_h1_sizes[mask], 
                           alpha=0.5, s=20, label=label_name)
     axes[0, 2].set_xlabel('Desviación Estándar de Señal')
@@ -208,7 +208,7 @@ def plot_signal_properties(results, save_path):
     
     # Plot 4: Longitud de señal
     axes[1, 0].hist([signal_lengths[labels == 0], signal_lengths[labels == 1]], 
-                     bins=20, label=['Ruido', 'Terremoto'], alpha=0.7)
+                     bins=20, label=['Ruido', 'Sismo'], alpha=0.7)
     axes[1, 0].set_xlabel('Longitud de Señal')
     axes[1, 0].set_ylabel('Frecuencia')
     axes[1, 0].set_title('Distribución Longitud de Señal')
@@ -217,7 +217,7 @@ def plot_signal_properties(results, save_path):
     
     # Plot 5: Tamaño de embedding
     axes[1, 1].hist([embedding_sizes[labels == 0], embedding_sizes[labels == 1]], 
-                     bins=20, label=['Ruido', 'Terremoto'], alpha=0.7)
+                     bins=20, label=['Ruido', 'Sismo'], alpha=0.7)
     axes[1, 1].set_xlabel('Tamaño de Embedding')
     axes[1, 1].set_ylabel('Frecuencia')
     axes[1, 1].set_title('Distribución Tamaño de Embedding')
@@ -227,7 +227,7 @@ def plot_signal_properties(results, save_path):
     # Plot 6: H0 vs H1
     for label in [0, 1]:
         mask = labels == label
-        label_name = "Ruido" if label == 0 else "Terremoto"
+        label_name = "Ruido" if label == 0 else "Sismo"
         axes[1, 2].scatter(dgm_h0_sizes[mask], dgm_h1_sizes[mask], 
                           alpha=0.5, s=20, label=label_name)
     axes[1, 2].set_xlabel('Tamaño H0')
@@ -243,7 +243,7 @@ def plot_signal_properties(results, save_path):
 
 
 def plot_prob_histograms(model, X, y, save_path, title):
-    """Graficar histogramas de P(terremoto) por clase (dos colores)."""
+    """Graficar histogramas de P(Sismo) por clase (dos colores)."""
     probs = model.predict_proba(X)
     p_terr = probs[:, 1]
 
@@ -252,8 +252,8 @@ def plot_prob_histograms(model, X, y, save_path, title):
 
     plt.figure(figsize=(7, 4))
     sns.histplot(p_terr_noise, color='steelblue', alpha=0.6, bins=20, label='Ruido (y=0)')
-    sns.histplot(p_terr_quake, color='darkorange', alpha=0.6, bins=20, label='Terremoto (y=1)')
-    plt.xlabel('P(Terremoto)')
+    sns.histplot(p_terr_quake, color='darkorange', alpha=0.6, bins=20, label='Sismo (y=1)')
+    plt.xlabel('P(Sismo)')
     plt.ylabel('Frecuencia')
     plt.title(title)
     plt.legend()
@@ -305,8 +305,8 @@ def main():
     print("Calculando probabilidades en train y test...")
     temp_model = BinaryClassificationTE(**BEST_PARAMS, seed=MODEL_SEED)
     temp_model.fit(X_train, y_train, verbose=False)
-    plot_prob_histograms(temp_model, X_train, y_train, RESULTS_DIR / "07_train_prob_hist.png", "Distribución de P(Terremoto) en Train")
-    plot_prob_histograms(temp_model, X_test, y_test, RESULTS_DIR / "07_test_prob_hist.png", "Distribución de P(Terremoto) en Test")
+    plot_prob_histograms(temp_model, X_train, y_train, RESULTS_DIR / "07_train_prob_hist.png", "Distribución de P(Sismo) en Train")
+    plot_prob_histograms(temp_model, X_test, y_test, RESULTS_DIR / "07_test_prob_hist.png", "Distribución de P(Sismo) en Test")
     
     print("\n" + "=" * 80)
     print("✓ Análisis completado")

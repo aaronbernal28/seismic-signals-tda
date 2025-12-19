@@ -102,12 +102,12 @@ def graficar_grafo(G, labels, save_path):
         print("No hay nodos para graficar.")
         return
 
-    pos = nx.spring_layout(G, weight="weight", seed=MODEL_SEED, iterations=500)
+    pos = nx.spring_layout(G, weight="weight", seed=MODEL_SEED, iterations=400, gravity=0.25)
     colores = ["#1f77b4" if labels[node] == 0 else "#d62728" for node in G.nodes]
-    pesos_aristas = [1.5 * datos["weight"] for _, _, datos in G.edges(data=True)]
+    pesos_aristas = [1.2 * datos["weight"] for _, _, datos in G.edges(data=True)]
 
     plt.figure(figsize=(10, 8))
-    nx.draw_networkx_edges(G, pos, alpha=0.25, edge_color="#999", width=pesos_aristas)
+    nx.draw_networkx_edges(G, pos, alpha=0.1, edge_color="#999", width=pesos_aristas)
     nx.draw_networkx_nodes(G, pos, node_color=colores, node_size=50, alpha=0.7)
     plt.axis("off")
     plt.title("Grafo de distancias bottleneck (layout de resortes)", fontsize=12)

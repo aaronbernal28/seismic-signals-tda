@@ -30,7 +30,7 @@ PROCESSED_DATA_PATH = "./data/processed/"
 # Train and test paths
 TRAIN_DATA_PATH = "./data/processed/signals_train.hdf5"
 TEST_DATA_PATH = "./data/processed/signals_test.hdf5"
-MAX_SAMPLES = 200  # Limitar muestras cargadas (None usa todo el dataset)
+MAX_SAMPLES = None  # Limitar muestras cargadas (None usa todo el dataset)
 
 # Resultados y grid search
 RESULTS_DIR = Path(__file__).parent.parent / "data" / "results" / "best_model_analysis"

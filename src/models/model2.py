@@ -5,6 +5,7 @@ from src.databases import PersistenceDiagramDatabaseTE
 from persim import bottleneck
 from sklearn.metrics import roc_auc_score
 from sklearn.base import BaseEstimator, ClassifierMixin
+from src.utils import validate_signal_length
 
 
 class BinaryClassificationTE(PersistenceDiagramDatabaseTE, BaseEstimator, ClassifierMixin):
@@ -110,14 +111,19 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE, BaseEstimator, Classi
         # Contador de señales omitidas
         skipped_count = 0
         skipped_by_label = {}
+        min_len = self.dim + (self.dim - 1) * self.tau
         
         for i, (xs, yi) in enumerate(zip(X, y)):
+            if not validate_signal_length(xs, self.dim, self.tau):
+                skipped_count += 1
+                skipped_by_label[yi] = skipped_by_label.get(yi, 0) + 1
+                continue
             success = self.add_signal(xs, label=yi)
             if not success:
                 skipped_count += 1
                 skipped_by_label[yi] = skipped_by_label.get(yi, 0) + 1
             if verbose and (i % 10 == 0):
-                print(f"Se agregó señal {i}/{len(y)}", end='\r')
+                print(f"Se agregó señal {i}/{len(y)} (mín {min_len})", end='\r')
         
         if skipped_count > 0:
             print(f"\n⚠ Señales omitidas durante entrenamiento: {skipped_count}")
@@ -145,12 +151,17 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE, BaseEstimator, Classi
             prob: float en [0, 1]
         """
         self._ensure_initialized()
+        if not validate_signal_length(xs, self.dim, self.tau):
+            return 0.5
         # Calcular diagrama de persistencia para la señal de entrada
         try:
             xs_dgm = self.transform(xs)
         except Exception as e:
             print(f"Error transformando la señal de entrada: {e}")
             return 0.5  # Devolver una probabilidad neutral en caso de error
+
+        if xs_dgm is None:
+            return 0.5  # Transform falló silenciosamente
 
         mean_dist_E = []
         mean_dist_N = []
@@ -198,7 +209,11 @@ class BinaryClassificationTE(PersistenceDiagramDatabaseTE, BaseEstimator, Classi
         self._ensure_initialized()
         probs_class1 = [self.predict_proba_sample(xs) for xs in X]
         # Devolver arreglo 2D: [prob_clase_0, prob_clase_1] para cada muestra
-        probs = np.array([[1 - p, p] for p in probs_class1])
+        probs = np.array([[1 - p, p] for p in probs_class1], dtype=float)
+        # Reemplazar valores no finitos por 0.5 manteniendo el orden
+        bad = ~np.isfinite(probs)
+        if bad.any():
+            probs[bad] = 0.5
         return probs
 
     def predict(self, X):

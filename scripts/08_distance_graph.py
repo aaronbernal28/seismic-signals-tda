@@ -14,7 +14,8 @@ import numpy as np
 
 # Agregar directorio padre al path para importar modulos de src
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from config.config import RESULTS_DIR, BEST_PARAMS, MODEL_SEED, MAX_SAMPLES
+from config.config import RESULTS_DIR, MAX_SAMPLES
+from config.best_te_params import BEST_PARAMS, MODEL_SEED
 from src.models.model2 import BinaryClassificationTE
 import src.utils as ut
 

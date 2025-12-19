@@ -101,7 +101,7 @@ def main():
     np.random.seed(28)
     
     # Cargar datasets
-    X_train, y_train, _, _ = ut.load_datasets(max_samples=400)
+    X_train, y_train, _, _ = ut.load_datasets(max_samples=200)
     
     # =========================================================================
     # DISTRIBUCIONES DE HIPERPARÁMETROS - COMPLETAR SI ES NECESARIO
@@ -111,10 +111,10 @@ def main():
     param_distributions = {
         'distance': [wasserstein],  # métrica de distancia entre diagramas de persistencia
         'weights': [(1,), (1, 1), (2, 1), (1, 2)],  # pesos para el cálculo de distancia (tuplas para compatibilidad)
-        'sample': list(range(20, 100, 10)),  # cantidad de diagramas a muestrear
+        'sample': list(range(20, 50, 10)),  # cantidad de diagramas a muestrear
         'thresh': np.linspace(0.25, 1.40, 10),  # umbral
         'alpha': np.linspace(0.25, 0.99, 10),  # proporción de subsampling FPS
-        'max_points': list(range(100, 300, 50)),  # número máximo de puntos de Takens
+        'max_points': list(range(100, 175, 10)),  # número máximo de puntos de Takens
         'seed': [28]  # semilla para reproducibilidad
     }
 
@@ -129,7 +129,7 @@ def main():
     # =========================================================================
     # PARÁMETROS DE LA BÚSQUEDA
     # =========================================================================
-    n_iter = 200  # número de combinaciones aleatorias por modelo
+    n_iter = 100  # número de combinaciones aleatorias por modelo
     cv_folds = 3  # número de pliegues de validación cruzada
     random_state = 28  # semilla para reproducibilidad
     n_jobs = 10  # número de trabajos paralelos para RandomizedSearchCV

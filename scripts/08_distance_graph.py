@@ -8,39 +8,22 @@ Descripcion: Calcula la matriz de distancias bottleneck entre los diagramas de p
 import sys
 import time
 from pathlib import Path
-
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 
 # Agregar directorio padre al path para importar modulos de src
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
+from config.config import RESULTS_DIR, BEST_PARAMS, MODEL_SEED, MAX_SAMPLES
 from src.models.model2 import BinaryClassificationTE
-from persim import wasserstein
 import src.utils as ut
 
-# Parametros optimos tomados de 06_best_model.py (grid_search_te rango 1)
-BEST_PARAMS = {
-    "distance": wasserstein,
-    "weights": (2, 1),
-    "thresh": np.inf,
-    "tau": 4,
-    "stride": 1,
-    "sample": 16,
-    "max_points": 100,
-    "dim": 4,
-    "alpha": 0.6833,
-}
-
-MODEL_SEED = 28
-RESULTS_DIR = Path(__file__).parent.parent / "data" / "results" / "best_model_analysis"
-GRAPH_PATH = RESULTS_DIR / "distance_graph.png"
+GRAPH_PATH = RESULTS_DIR / "08_distance_graph.png"
 
 
 def cargar_datos_prueba():
     """Cargar conjunto de prueba y filtrar senales muy cortas."""
-    _, _, X_test, y_test = ut.load_datasets(max_samples=None)
+    _, _, X_test, y_test = ut.load_datasets(max_samples=MAX_SAMPLES)
     X_test, y_test, _ = ut.filter_valid_signals(
         X_test,
         y_test,

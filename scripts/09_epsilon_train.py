@@ -16,19 +16,18 @@ from scipy.spatial.distance import pdist
 
 # Agregar directorio padre al path para importar modulos de src
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
+from config.config import RESULTS_DIR, MAX_SAMPLES
 import src.utils as ut
 
 # Conjuntos de parametros a comparar (variando dim y tau)
 PARAM_GRID = [
     {"name": "d4_t4", "dim": 4, "tau": 4},
-    {"name": "d5_t4", "dim": 5, "tau": 4},
-    {"name": "d4_t6", "dim": 4, "tau": 6},
-    {"name": "d5_t6", "dim": 5, "tau": 6},
+    {"name": "d2_t4", "dim": 2, "tau": 4},
+    {"name": "d4_t2", "dim": 4, "tau": 2},
+    {"name": "d2_t2", "dim": 2, "tau": 2},
 ]
 
-RESULTS_DIR = Path(__file__).parent.parent / "data" / "results" / "best_model_analysis"
-PLOT_PATH = RESULTS_DIR / "epsilon_train_grid.png"
+PLOT_PATH = RESULTS_DIR / "09_epsilon_train_grid.png"
 
 
 def compute_diameter(point_cloud: np.ndarray) -> float:
@@ -41,7 +40,6 @@ def compute_diameter(point_cloud: np.ndarray) -> float:
     if len(dists) == 0:
         return 0.0
     return float(np.max(dists))
-
 
 
 def process_param_set(X_train, dim, tau):
@@ -66,7 +64,7 @@ def main():
     print("=" * 70)
 
     # Cargar datasets (solo train) una sola vez
-    X_train, y_train, _, _ = ut.load_datasets(max_samples=None)
+    X_train, y_train, _, _ = ut.load_datasets(max_samples=MAX_SAMPLES)
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 8), sharex=False, sharey=False)
     axes = axes.ravel()

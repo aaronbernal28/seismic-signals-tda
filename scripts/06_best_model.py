@@ -21,27 +21,9 @@ from persim import wasserstein, plot_diagrams
 
 # Agregar directorio padre al path para importar módulos src
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
+from config.config import RESULTS_DIR, BEST_PARAMS, MODEL_SEED, MAX_SAMPLES
 from src.models.model2 import BinaryClassificationTE
 import src.utils as ut
-
-# Configuración para el modelo TE basada en run_grid_search.py
-BEST_PARAMS = {
-    'distance': wasserstein,
-    'weights': (2, 1),
-    'thresh': np.inf,
-    'tau': 4,
-    'stride': 1,
-    'sample': 16,
-    'max_points': 100,
-    'dim': 4,
-    'alpha': 0.6833
-}
-
-# La búsqueda de cuadrícula usó seed=28, así que debemos usarla aquí para reproducibilidad
-MODEL_SEED = 28
-
-RESULTS_DIR = Path(__file__).parent.parent / "data" / "results" / "best_model_analysis"
 
 def plot_confusion_matrix(y_true, y_pred, save_path):
     """Generar y guardar un mapa de calor de matriz de confusión."""
@@ -309,7 +291,7 @@ def main():
     print(f"Parámetros: {BEST_PARAMS}")
     
     # 1. Cargar Datos
-    X_train, y_train, X_test, y_test = ut.load_datasets(max_samples=None) # Usando conjunto de datos completo para evaluación final
+    X_train, y_train, X_test, y_test = ut.load_datasets(max_samples=MAX_SAMPLES)
     
     # 1.5. Validar y filtrar señales muy cortas
     print(f"\n{'─' * 70}")
@@ -377,8 +359,8 @@ def main():
     print("GENERANDO VISUALIZACIONES")
     print(f"{'=' * 70}")
     
-    plot_confusion_matrix(y_test, y_pred, RESULTS_DIR / "confusion_matrix.png")
-    plot_roc_curve(y_test, y_proba, auc, RESULTS_DIR / "roc_curve.png")
+    plot_confusion_matrix(y_test, y_pred, RESULTS_DIR / "06_confusion_matrix_best.png")
+    plot_roc_curve(y_test, y_proba, auc, RESULTS_DIR / "06_roc_curve_best.png")
     plot_examples_grid(
         X_test,
         y_test,
@@ -387,8 +369,8 @@ def main():
         samples_per_class=3,
         model=model,
         model_params=BEST_PARAMS,
-        save_path=RESULTS_DIR / "examples_grid.png",
-        signals_save_path=RESULTS_DIR / "examples_signals.png",
+        save_path=RESULTS_DIR / "06_examples_diagrams_grid.png",
+        signals_save_path=RESULTS_DIR / "06_examples_signals_grid.png",
         seed=42,  # Different seed for varied examples
         min_h0_points=10,
     )

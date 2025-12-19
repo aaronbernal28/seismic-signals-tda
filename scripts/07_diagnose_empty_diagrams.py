@@ -8,28 +8,12 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from persim import wasserstein, plot_diagrams
 
 # Agregar directorio padre al path
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
+from config.config import RESULTS_DIR, BEST_PARAMS, MODEL_SEED, MAX_SAMPLES
 from src.models.model2 import BinaryClassificationTE
 import src.utils as ut
-
-# Usar los mismos parámetros del mejor modelo
-BEST_PARAMS = {
-    'distance': wasserstein,
-    'weights': (2, 1),
-    'thresh': np.inf,
-    'tau': 4,
-    'stride': 1,
-    'sample': 16,
-    'max_points': 100,
-    'dim': 4,
-    'alpha': 0.6833
-}
-
-MODEL_SEED = 28
 
 def analyze_diagram_sizes(X, y, model_params):
     """Analizar tamaños de diagramas de persistencia para todas las señales."""
@@ -281,15 +265,13 @@ def plot_prob_histograms(model, X, y, save_path, title):
 def main():
     """Flujo principal."""
     
-    # Configuración
-    RESULTS_DIR = Path(__file__).parent.parent / "data" / "results" / "best_model_analysis"
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    
+
     np.random.seed(MODEL_SEED)
     
     # Cargar datos
     print("Cargando datos de prueba...")
-    X_train, y_train, X_test, y_test = ut.load_datasets(max_samples=None)
+    X_train, y_train, X_test, y_test = ut.load_datasets(max_samples=MAX_SAMPLES)
     
     # Filtrar señales válidas (mismo criterio que el modelo principal)
     X_train, y_train, _ = ut.filter_valid_signals(
@@ -317,14 +299,14 @@ def main():
     find_problematic_signals(results, top_n=10)
     
     # Crear gráficos
-    plot_signal_properties(results, RESULTS_DIR / "diagram_sizes_analysis.png")
+    plot_signal_properties(results, RESULTS_DIR / "07_diagram_sizes_analysis.png")
     
     # Histogramas de probabilidades en train y test
     print("Calculando probabilidades en train y test...")
     temp_model = BinaryClassificationTE(**BEST_PARAMS, seed=MODEL_SEED)
     temp_model.fit(X_train, y_train, verbose=False)
-    plot_prob_histograms(temp_model, X_train, y_train, RESULTS_DIR / "train_prob_hist.png", "Distribución de P(Terremoto) en Train")
-    plot_prob_histograms(temp_model, X_test, y_test, RESULTS_DIR / "test_prob_hist.png", "Distribución de P(Terremoto) en Test")
+    plot_prob_histograms(temp_model, X_train, y_train, RESULTS_DIR / "07_train_prob_hist.png", "Distribución de P(Terremoto) en Train")
+    plot_prob_histograms(temp_model, X_test, y_test, RESULTS_DIR / "07_test_prob_hist.png", "Distribución de P(Terremoto) en Test")
     
     print("\n" + "=" * 80)
     print("✓ Análisis completado")

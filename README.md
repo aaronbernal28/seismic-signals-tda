@@ -15,22 +15,20 @@ Este trabajo presenta una metodología para la detección automática de sismos 
 seismic-signals-tda/
 ├── config/              # Archivos de configuración y parámetros
 ├── data/
-│   ├── raw/             # Datos sísmicos crudos (formato XML)
-│   ├── processed/       # Señales preprocesadas en formato HDF5
-│   └── results/         # Resultados de modelos, CSVs y gráficas
-├── docs/                # Documentación
-├── notebooks/           # Notebooks de Jupyter para experimentos y visualización
-├── scripts/             # Pipeline de procesamiento y entrenamiento
-│   ├── 01_get_raw_events.py    # Descarga el catálogo desde IRIS
-│   ├── 02_get_intervals.py     # Genera intervalos de evento/no evento
-│   ├── 03_get_signals.py       # Descarga formas de onda
-│   └── 06_best_model.py        # Evalúa la configuración óptima del modelo
-├── src/
-│   ├── databases.py     # Implementación de base de datos de diagramas de persistencia
-│   ├── preprocess.py    # Utilidades de preprocesamiento de señales
-│   ├── models/          # Modelos de clasificación
-│   └── utils.py         # Funciones utilitarias generales
-└── run_grid_search.py   # Script de ajuste de hiperparámetros
+│   ├── raw/             # Datos sísmicos crudos (XML)
+│   ├── processed/       # Señales preprocesadas en HDF5
+│   └── results/         # CSVs y gráficas generadas
+├── notebooks/           # Exploración y prototipos
+├── scripts/             # Pipeline completo
+│   ├── 01_get_raw_events.py    # Catálogo desde IRIS
+│   ├── 02_get_intervals.py     # Intervalos evento/no evento
+│   ├── 03_get_signals.py       # Descarga de formas de onda
+│   ├── 06_best_model.py        # Evalúa el mejor modelo TE
+│   ├── 07_diagnose_empty_diagrams.py # Diagnóstico de diagramas vacíos
+│   ├── 08_distance_graph.py    # Grafo k-NN con distancias bottleneck
+│   └── 09_epsilon_train.py     # Distribución de diámetros (dim/tau)
+├── src/                # Código fuente (models, preprocess, utils)
+└── run_grid_search.py  # Búsqueda de hiperparámetros
 ```
 
 ## Metodología
@@ -59,25 +57,38 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-## Uso
+## Flujo de uso
 
-1. Ejecuta los scripts de adquisición de datos en orden:
-   ```bash
-   python scripts/01_get_raw_events.py
-   python scripts/02_get_intervals.py
-   python scripts/03_get_signals.py
-   ```
+1) Descargar y preparar datos (requiere conexión a IRIS):
+```bash
+python scripts/01_get_raw_events.py
+python scripts/02_get_intervals.py
+python scripts/03_get_signals.py
+```
 
 2. Realiza la búsqueda de hiperparámetros para entrenar el modelo:
    ```bash
    python run_grid_search.py
    ```
 
-3. Entrena y evalúa el mejor modelo: para reproducir los mejores resultados usando los parámetros encontrados:
-   ```bash
-   python scripts/06_best_model.py
-   ```
-Los resultados se guardarán en data/results/best_model_analysis/
+3) Evaluar el mejor modelo y generar salidas numeradas en data/results/best_model_analysis:
+```bash
+python scripts/06_best_model.py
+```
+
+4) Análisis adicionales (opcional):
+- Diagnóstico de diagramas vacíos y distribuciones de probabilidad:
+  ```bash
+  python scripts/07_diagnose_empty_diagrams.py
+  ```
+- Grafo de distancias bottleneck sobre el set de prueba:
+  ```bash
+  python scripts/08_distance_graph.py
+  ```
+- Distribución de diámetros para distintas configuraciones (train):
+  ```bash
+  python scripts/09_epsilon_train.py
+  ```
 
 ## Referencias
 
